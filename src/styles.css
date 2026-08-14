@@ -766,6 +766,25 @@ section.refined-quick-todo .quick-note textarea{min-height:76px;resize:vertical;
   .shell:has(.tertiary-todo-backdrop) .compact-tertiary-todo{width:320px;border:1px solid color-mix(in srgb,var(--c) 28%,#dfe5e2);border-radius:20px;box-shadow:0 22px 58px rgba(47,58,53,.2)}
 }
 
+/* Matter todos use a quiet, three-state control that also drives the Today list. */
+.content-detail-modal .todo-link-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.content-detail-modal .matter-task-row{display:grid;grid-template-columns:22px minmax(0,1fr) 14px;align-items:center;gap:9px;min-height:54px;border:1px solid #e2e7e4;border-radius:13px;background:#fff;padding:9px 11px;cursor:pointer;transition:border-color .18s ease,background .18s ease,transform .18s ease,box-shadow .18s ease}
+.content-detail-modal .matter-task-row:hover{border-color:color-mix(in srgb,var(--status-color) 34%,#dfe5e2);background:color-mix(in srgb,var(--status-tint) 44%,#fff);box-shadow:0 7px 18px rgba(49,60,55,.055);transform:translateY(-1px)}
+.content-detail-modal .matter-task-row>div{min-width:0}.content-detail-modal .matter-task-row h4{display:flex;min-width:0;align-items:center;gap:6px;overflow:hidden;margin:0;color:#303934;font-size:11px;line-height:1.35;white-space:nowrap}.content-detail-modal .matter-task-row p{margin:3px 0 0;color:#929b96;font-size:9px}.content-detail-modal .matter-task-row>svg{width:13px;color:#a5ada9}
+.matter-task-status-dot{display:grid;width:20px;height:20px;place-items:center;border:0;border-radius:50%;background:var(--status-tint);padding:0;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease}.matter-task-status-dot:hover{transform:scale(1.08);box-shadow:0 0 0 3px color-mix(in srgb,var(--status-color) 13%,transparent)}.matter-task-status-dot i{display:block;width:7px;height:7px;border-radius:50%;background:var(--status-color);box-shadow:0 1px 3px color-mix(in srgb,var(--status-color) 28%,transparent)}
+.matter-task-status-label{flex:0 0 auto;border:1px solid color-mix(in srgb,var(--status-color) 22%,transparent);border-radius:999px;background:var(--status-tint);padding:2px 5px;color:var(--status-color);font-size:7px;font-weight:600;line-height:1;white-space:nowrap}
+.matter-task-row.status-ongoing{--status-color:#d99a32;--status-tint:#fff7e8}.matter-task-row.status-pending{--status-color:#70a381;--status-tint:#eef7f1}.matter-task-row.status-ended{--status-color:#929c97;--status-tint:#f2f4f3}
+.schedule-todos .tasks article.arranged{border-color:#dfe5e2;background:#fff;box-shadow:none}
+.schedule-todos .tasks article.arranged:hover{background:#fff}
+.content-detail-modal .matter-task-row.status-ended h4{text-decoration:line-through;text-decoration-color:#bcc3bf;color:#7f8984}.completed-todos .matter-task-row{grid-template-columns:22px minmax(0,1fr) 12px;width:100%;margin-top:8px;padding:8px 9px}.completed-todos .matter-task-status-label{display:none}
+
+/* Keep the realm visible when its matter detail opens as a tertiary layer. */
+@media(min-width:901px){
+  .shell:has(.nested-content-detail-backdrop) .nested-content-detail-backdrop{align-items:center;justify-content:flex-end;padding:28px 34px;background:rgba(43,52,48,.13);backdrop-filter:blur(1px)}
+  .shell:has(.nested-content-detail-backdrop) .nested-content-detail-modal{width:min(700px,calc(100vw - 72px));min-height:min(420px,calc(100vh - 72px));border-radius:22px;box-shadow:0 28px 72px rgba(38,48,43,.22),0 2px 8px rgba(38,48,43,.05)}
+  .nested-content-detail-modal .content-detail-body{grid-template-columns:minmax(0,1.35fr) minmax(175px,.65fr)}
+}
+
 /* The default collapsed creator should feel like a quick capture card. */
 .quick-todo-modal.refined-quick-todo:not(.unified-todo-edit):has(.quick-collapsed-details){width:min(540px,calc(100vw - 40px));padding:23px 27px 24px}
 .quick-todo-modal.refined-quick-todo:not(.unified-todo-edit):has(.quick-collapsed-details)>header{margin-bottom:16px}
@@ -774,18 +793,6 @@ section.refined-quick-todo .quick-note textarea{min-height:76px;resize:vertical;
 .quick-todo-modal.refined-quick-todo:not(.unified-todo-edit):has(.quick-collapsed-details) .quick-title input{height:44px}
 .quick-todo-modal.refined-quick-todo:not(.unified-todo-edit):has(.quick-collapsed-details) .quick-details-master-toggle{min-height:38px;margin-top:12px}
 .quick-todo-modal.refined-quick-todo:not(.unified-todo-edit):has(.quick-collapsed-details)>.quick-save{height:40px;margin-top:13px}
-
-/* Compact tertiary todo detail, visually layered over the unchanged matter window. */
-.tertiary-detail-backdrop{z-index:112;background:rgba(43,52,48,.16);padding:28px;backdrop-filter:blur(1.5px)}
-.compact-todo-detail{position:relative;width:min(560px,calc(100vw - 48px));max-height:calc(100vh - 56px);overflow:auto;border:1px solid rgba(221,227,224,.95);border-radius:24px;background:#fff;padding:25px 27px 24px;box-shadow:0 30px 80px rgba(37,47,43,.24),0 2px 8px rgba(37,47,43,.06)}
-.compact-todo-detail>.modal-close{top:22px;right:22px}
-.compact-todo-detail>header{display:flex;align-items:center;gap:12px;margin-bottom:18px}.compact-todo-detail>header>span{display:grid;width:42px;height:42px;place-items:center;border-radius:13px;background:var(--t);color:var(--c)}.compact-todo-detail>header svg{width:19px}.compact-todo-detail h2{margin:0;font-size:20px;letter-spacing:-.02em}
-.compact-detail-card{position:relative;border:1px solid #e1e6e3;border-radius:16px;background:#fff;padding:17px 18px}.compact-detail-title{display:grid;gap:8px;padding-right:122px}.compact-detail-title>span,.compact-detail-note>span,.compact-detail-subtasks>div>span,.compact-detail-meta span{color:#7b8580;font-size:10px}.compact-detail-title input{height:35px;border:0;background:transparent;padding:0;color:#28312d;font:inherit;font-size:17px;font-weight:650;outline:none}.compact-detail-status{position:absolute;top:45px;right:18px;display:flex;align-items:center;gap:6px;border:0;border-radius:10px;background:var(--t);padding:8px 10px;color:var(--c);font-size:10px;font-weight:600}.compact-detail-status i{width:7px;height:7px;border-radius:50%;background:var(--c)}.compact-detail-status svg{width:11px}.compact-detail-status.done{color:#6f8e79}
-.compact-detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:9px;border-top:1px solid #edf0ee;border-bottom:1px solid #edf0ee;padding:16px 5px}.compact-detail-meta>div{display:grid;gap:8px}.compact-detail-meta b{display:flex;align-items:center;gap:7px;color:#515c57;font-size:11px;font-weight:500}.compact-detail-meta svg{width:15px;color:#86908b}
-.compact-detail-note{display:grid;gap:7px;padding:15px 5px 13px}.compact-detail-note textarea{width:100%;min-height:58px;border:0;background:transparent;padding:0;color:#59635e;font:inherit;font-size:10px;line-height:1.65;resize:vertical;outline:none}.compact-detail-note textarea::placeholder{color:#a0a8a4}
-.compact-detail-subtasks{border-top:1px solid #edf0ee;padding:14px 5px 2px}.compact-detail-subtasks>div:first-child{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.compact-detail-subtasks small{color:#9ba39f;font-size:9px}.compact-detail-subtasks>section{overflow:hidden;border:1px solid #e3e8e5;border-radius:11px}.compact-detail-subtasks>section label{display:grid;grid-template-columns:20px 1fr 24px;align-items:center;gap:5px;min-height:36px;border-bottom:1px solid #edf0ee;padding:4px 8px}.compact-detail-subtasks>section label:last-child{border-bottom:0}.compact-detail-subtasks label>i{width:17px;height:17px;border:1px solid #b9c4be;border-radius:50%}.compact-detail-subtasks label input{height:27px;border:0;background:transparent;color:#4f5954;font:inherit;font-size:10px;outline:none}.compact-detail-subtasks label button{display:grid;width:22px;height:22px;place-items:center;border:0;background:transparent;color:#a3aba7}.compact-detail-subtasks label button svg{width:11px}.compact-subtask-add{display:grid!important;grid-template-columns:1fr auto;gap:7px;margin-top:8px!important}.compact-subtask-add input{height:36px;border:1px solid #e1e6e3;border-radius:9px;padding:0 10px;font:inherit;font-size:9px;outline:none}.compact-subtask-add button{display:flex;align-items:center;gap:4px;border:1px solid #dfe5e2;border-radius:9px;background:#fff;padding:0 11px;color:#75807a;font-size:9px}.compact-subtask-add button:disabled{opacity:.42}.compact-subtask-add svg{width:11px}
-.compact-todo-detail>footer{display:flex;align-items:center;justify-content:space-between;margin-top:16px}.compact-todo-detail>footer>div{display:flex;gap:9px}.compact-todo-detail>footer button{display:flex;min-height:40px;align-items:center;justify-content:center;gap:5px;border:1px solid #dfe4e2;border-radius:10px;background:#fff;padding:0 18px;color:#68736e;font-size:10px}.compact-todo-detail>footer button svg{width:13px}.compact-todo-detail>footer .compact-detail-delete{border:0;padding-left:2px;color:#9aa29e}.compact-todo-detail>footer .compact-detail-complete{border-color:var(--c);background:var(--c);color:#fff;box-shadow:0 7px 16px color-mix(in srgb,var(--c) 20%,transparent)}
-@media(max-width:700px){.tertiary-detail-backdrop{align-items:flex-end;padding:0}.compact-todo-detail{width:100%;max-height:91vh;border-radius:24px 24px 0 0;padding:23px 18px}.compact-detail-meta{grid-template-columns:1fr}.compact-detail-title{padding-right:105px}}
 
 /* One compact creation-dialog system: realm, matter and todo. */
 @media(min-width:701px){
@@ -804,8 +811,8 @@ section.refined-quick-todo .quick-note textarea{min-height:76px;resize:vertical;
   .refined-realm-modal,
   .content-detail-modal,
   .quick-todo-modal.unified-todo-edit{border-radius:22px}
-  .refined-realm-modal,
-  .content-detail-modal{width:min(760px,calc(100vw - 64px))}
+  .refined-realm-modal{width:min(760px,calc(100vw - 64px))}
+  .content-detail-modal{width:min(700px,calc(100vw - 64px))}
   .refined-realm-modal{min-height:min(440px,calc(100vh - 64px))}
   .content-detail-modal{min-height:min(420px,calc(100vh - 64px))}
   .quick-todo-modal.unified-todo-edit{width:min(600px,calc(100vw - 48px));max-height:calc(100vh - 48px);padding:22px 25px}
