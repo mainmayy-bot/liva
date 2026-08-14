@@ -1,20 +1,72 @@
-# Fortune Dashboard（拯救版）
+# Liva
 
-## 页面结构
+一个用于管理人生版图、生活事项、今日待办与时间轴的个人生活工作台。
 
-1. **当下主题**：以一句有方向感的问候建立情绪，不展示任务数字。
-2. **此刻方向**：最多三个重点方向，呈现意义、状态与轻量进度。
-3. **人生地图**：按 Fortune / Beauty / Soul / Admin 四个领域横向展开，让方向之间形成路径感，而非卡片九宫格。
-4. **最近行动**：用自然语言记录正在发生的小行动，点击可切换完成状态。
-5. **辅助信息**：提醒和一句话被放在内容末端，不争夺注意力。
+## 本地运行
 
-## 四大版图
+要求 Node.js 20+ 和 pnpm。
 
-- **Fortune**：能力、事业、财富与长期选择。
-- **Beauty**：身体能量、自我照顾与个人美感。
-- **Soul**：阅读、旅行、创造与精神体验。
-- **Admin**：用低负担的秩序承接生活琐事。
+```bash
+pnpm install
+cp .env.example .env.local
+pnpm dev
+```
 
-每个版图都有独立的本季主题、三个核心方向、关系节奏、最近行动和轻提醒；它们共用一套信息架构，但不是简单换色复制。
+没有配置 Supabase 时，应用仍会以本地模式正常运行。
 
-数据目前集中在 `src/main.jsx` 顶部的 mock 数据数组中，后续可以直接替换为接口返回结果。
+## 接入 Supabase
+
+1. 在 Supabase 创建项目。
+2. 打开项目的 **SQL Editor**，执行 [`supabase/schema.sql`](supabase/schema.sql)。
+3. 从 Supabase 项目设置复制 Project URL 和 Publishable Key。
+4. 复制 `.env.example` 为 `.env.local`，填写：
+
+```env
+VITE_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLISHABLE_KEY
+VITE_LIVA_WORKSPACE_ID=一个仅自己使用的随机UUID
+```
+
+`VITE_LIVA_WORKSPACE_ID` 是云端空间标识。希望多台设备共享同一份数据时，各处必须使用同一个值。请使用随机 UUID，不要使用示例值。
+
+应用启动时会读取 Supabase 中的版图、事项和待办；修改后约 700ms 自动同步。前端只使用 Supabase Publishable Key，不要把 `service_role` 密钥放进浏览器或 GitHub。
+
+## 上传 GitHub
+
+```bash
+git init
+git add .
+git commit -m "Initial Liva release"
+git branch -M main
+git remote add origin https://github.com/YOUR_NAME/YOUR_REPO.git
+git push -u origin main
+```
+
+`.env.local` 已被 `.gitignore` 排除，不会上传密钥。
+
+## 生成公开链接并自动部署
+
+推荐使用 Vercel：
+
+1. 登录 Vercel，选择 **Add New → Project**。
+2. 导入刚上传的 GitHub 仓库。
+3. 在 Environment Variables 中添加上述三个 `VITE_` 变量。
+4. 点击 Deploy。
+
+Vercel 会识别 Vite 配置并生成公开网址。之后每次向 GitHub `main` 分支推送，线上版本都会自动更新；其他分支和 Pull Request 会生成独立预览链接。
+
+## 构建
+
+```bash
+pnpm build
+pnpm preview
+```
+
+生产文件输出到 `dist/`，该目录无需提交 GitHub。
+
+## 数据安全
+
+- 数据表已启用 Row Level Security。
+- 浏览器请求通过随机 Workspace ID 访问对应快照。
+- Publishable Key 可以用于前端；`service_role` 密钥绝不能进入前端代码。
+- 若未来开放给多个用户，建议接入 Supabase Auth，并将 RLS 策略升级为按 `auth.uid()` 隔离。

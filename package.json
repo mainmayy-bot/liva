@@ -1,5 +1,5 @@
 {
-  "name": "fortune-rescue-dashboard",
+  "name": "liva",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,12 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
+    "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "lucide-react": "latest"
-  },
-  "devDependencies": {}
+    "typescript": "latest",
+    "vite": "latest"
+  }
 }
