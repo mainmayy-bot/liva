@@ -292,3 +292,58 @@ html[data-density="relaxed"] .profile-subpage { gap: 18px; padding-block: 18px; 
 /* Keep the memo completion glyph optically centered. */
 .memo-check { padding: 0; line-height: 0; }
 .memo-check svg { display: block; flex: none; transform: translateY(0); stroke-width: 2.2; }
+/* Drag handles for board cards. */
+.draggable-board-card { cursor: grab; }
+.draggable-board-card:active { cursor: grabbing; }
+.direction-detail article[draggable], .life-board > article[draggable] { cursor: grab; }
+.direction-detail article[draggable]:active, .life-board > article[draggable]:active { cursor: grabbing; }
+
+/* Calendar and time controls share the soft field treatment. */
+.axis-date-controls .axis-date-picker {
+  position: relative;
+  width: auto;
+  min-width: 92px;
+  overflow: hidden;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.axis-date-controls .axis-date-picker span { padding: 0; white-space: nowrap; }
+.axis-date-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  inset: auto auto 0 0;
+  appearance: none;
+  opacity: 0;
+  pointer-events: none;
+}
+.quick-time-fields label { position: relative; }
+.quick-time-fields input[type="date"],
+.quick-time-fields input[type="time"] {
+  color-scheme: light;
+  cursor: pointer;
+}
+.quick-time-fields input[type="date"]::-webkit-calendar-picker-indicator,
+.quick-time-fields input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: .55;
+  filter: sepia(.15) saturate(.7);
+}
+
+/* Make the second-level realm window slightly roomier; tertiary windows keep their compact treatment. */
+.refined-realm-modal { width: min(1040px, 92vw); max-height: 91vh; }
+.refined-realm-modal .realm-modal-body { padding: 22px; }
+.refined-realm-modal .direction-profile-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 9px; }
+.refined-realm-modal .direction-profile-grid > article { min-height: 0; aspect-ratio: 1; padding: 16px; }
+.refined-realm-modal .direction-profile-icon { width: 46px; height: 46px; margin-bottom: 14px; }
+.refined-realm-modal .direction-profile-icon svg { width: 23px; height: 23px; }
+.refined-realm-modal .direction-profile-grid > article > p { min-height: 30px; margin: 8px 0; }
+.refined-realm-modal .direction-profile-state { margin-top: 12px; padding-top: 10px; }
+.tertiary-realm-backdrop .refined-realm-modal,
+.nested-realm-modal { width: min(1080px, 90vw); }
+@media (max-width: 900px) {
+  .refined-realm-modal .direction-profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .refined-realm-modal .direction-profile-grid { grid-template-columns: 1fr; }
+}
