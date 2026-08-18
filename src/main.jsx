@@ -367,8 +367,9 @@ function Section({ title, sub, action, children, className = "", id }) {
     </section>
   );
 }
-function RealmCard({ realm, index, openModal }) {
+function RealmCard({ realm, index, openModal, matters }) {
   const Icon = realm.Icon,
+    matterCount = matters.filter((matter) => matter.realm === realm.name).length,
     show = () => {
       window.__boardOpenModal = openModal;
       openModal(`realmModal-${index}`);
@@ -389,7 +390,7 @@ function RealmCard({ realm, index, openModal }) {
         </div>
       </div>
       <p className="project-count">
-        <i /> {realm.directions.length} 个生活事项
+        <i /> {matterCount} 个生活事项
       </p>
       <button
         className="detail"
@@ -1173,7 +1174,12 @@ function Dashboard({ navigate, openModal, tasks, setTasks }) {
               e.preventDefault();
               reorderRealm(i);
             }} onDragEnd={() => setDraggedRealm(null)} key={r.name}>
-              <RealmCard realm={r} index={realms.findIndex((item) => item.name === r.name)} openModal={openModal} />
+              <RealmCard
+                realm={r}
+                matters={matters}
+                index={realms.findIndex((item) => item.name === r.name)}
+                openModal={openModal}
+              />
             </div>
           ))}
         </div>
@@ -3433,7 +3439,7 @@ function QuickSidebar({
             >
               <i style={{ background: realm.color }} />
               <span>{realm.name}</span>
-              <b>{realm.directions.length}</b>
+              <b>{matters.filter((matter) => matter.realm === realm.name).length}</b>
             </button>
           ))}
         </section>
@@ -3776,6 +3782,7 @@ function App() {
       {modalStack.map((entry, index) => (
         <div
           className={`modal-layer ${closingLayers.includes(index) ? "is-closing" : ""}`}
+          style={{ "--modal-depth": index }}
           key={`${entry}-${index}`}
         >
           <ModalLayer
