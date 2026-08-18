@@ -803,3 +803,8 @@ section.refined-quick-todo .quick-note textarea{min-height:76px;resize:vertical;
   .quick-todo-modal.unified-todo-edit .quick-time-fields{margin-top:8px}
   .quick-todo-modal.unified-todo-edit .unified-todo-footer{margin-top:13px;padding-top:12px}
 }
+/* Existing matter titles can be edited in place and keep their linked tasks. */
+.content-title-edit-wrap{min-width:0}
+.content-title-button{display:block;margin:0;border:0;background:transparent;padding:0;color:inherit;text-align:left}
+.content-title-button h2{cursor:text}
+.content-title-input{width:min(320px,100%);border:0;border-bottom:1px solid var(--c);background:transparent;padding:0 0 3px;color:inherit;font:inherit;font-size:20px;font-weight:700;outline:none}

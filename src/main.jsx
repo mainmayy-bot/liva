@@ -250,8 +250,15 @@ function taskOccursOnDate(task, dateKey) {
   const days = Math.floor((target - start) / 86400000);
   if (task.repeat === "daily") return true;
   if (task.repeat === "weekdays") return target.getDay() >= 1 && target.getDay() <= 5;
+  if (task.repeat === "weekends") return target.getDay() === 0 || target.getDay() === 6;
   if (task.repeat === "weekly") return days % 7 === 0;
+  if (task.repeat === "biweekly") return days % 14 === 0;
   if (task.repeat === "monthly") return target.getDate() === start.getDate();
+  if (task.repeat === "quarterly")
+    return target.getDate() === start.getDate() &&
+      (target.getMonth() - start.getMonth() + 12) % 3 === 0;
+  if (task.repeat === "yearly")
+    return target.getDate() === start.getDate() && target.getMonth() === start.getMonth();
   return false;
 }
 
@@ -259,8 +266,12 @@ function repeatLabel(value) {
   return {
     daily: "每天",
     weekdays: "每个工作日",
+    weekends: "每个周末",
     weekly: "每周",
+    biweekly: "每两周",
     monthly: "每月",
+    quarterly: "每季度",
+    yearly: "每年",
   }[value] || "不重复";
 }
 const directionIcons = [BriefcaseBusiness, BookOpen, Compass, Sparkles],
@@ -542,6 +553,20 @@ function ScheduleTodoPanel({
     },
     progress = sortItems(active.filter(isTimed)),
     anytime = sortItems(active.filter((t) => !isTimed(t))),
+    moveToAnytime = (e) => {
+      e.preventDefault();
+      try {
+        const source = JSON.parse(e.dataTransfer.getData("text/plain"));
+        if (!source?.id) return;
+        setTasks((current) =>
+          current.map((item) =>
+            item.id === source.id
+              ? { ...item, date: selectedDateKey, clock: "", time: "随时待办" }
+              : item,
+          ),
+        );
+      } catch {}
+    },
     reorderTask = (sourceId, targetId) => {
       if (sortMode !== "manual" || sourceId === targetId) return;
       setTasks((current) => {
@@ -706,7 +731,11 @@ function ScheduleTodoPanel({
       </div>
       <div className="dashboard-task-scroll grouped-task-scroll">
         <Cards items={progress} />
-        <div className="anytime-heading">
+        <div
+          className="anytime-heading"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={moveToAnytime}
+        >
           <span>随时待办</span>
         </div>
         <Cards items={anytime} />
@@ -800,9 +829,11 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
     });
   useEffect(() => {
     setScheduled((current) => {
-      const active = current.filter((s) =>
-          tasks.some((t) => t.id === s.taskId && !t.done && !t.archived),
+        const active = current.filter((s) =>
+        tasks.some(
+          (t) => t.id === s.taskId && t.date && t.clock && !t.done && !t.archived,
         ),
+      ),
         timed = tasks.filter(
           (t) =>
             t.date &&
@@ -2328,8 +2359,12 @@ function InlineTodoEditor({ task, setTasks, onClose }) {
             <option value="">不重复</option>
             <option value="daily">每天</option>
             <option value="weekdays">每个工作日</option>
+            <option value="weekends">每个周末</option>
             <option value="weekly">每周</option>
+            <option value="biweekly">每两周</option>
             <option value="monthly">每月</option>
+            <option value="quarterly">每季度</option>
+            <option value="yearly">每年</option>
           </select>
         </label>
       </div>
@@ -2381,7 +2416,7 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
       ),
     ),
     [subtitle, setSubtitle] = useState(
-      realm.note ? [realm.note, "探索与成长"].filter(Boolean).join(" · ") : "",
+      realm.note || "",
     ),
     [adding, setAdding] = useState(false),
     [draft, setDraft] = useState(""),
@@ -2418,6 +2453,7 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
   };
   const saveSubtitle = () => {
     realm.note = subtitle.trim();
+    onDataChange?.();
   };
   const cycleStatus = (i) =>
     setStatuses((v) =>
@@ -2583,7 +2619,13 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
               <h3>事项一览</h3>
               <p>长期经营、持续探索，也允许它们自然变化</p>
             </div>
-            <button onClick={() => setAdding(true)}>
+              <button
+                onClick={() =>
+                  window.__boardOpenModal?.(
+                    `addDirection:${encodeURIComponent(realm.name)}`,
+                  )
+                }
+              >
               <Plus /> 新建事项
             </button>
           </div>
@@ -2950,13 +2992,13 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
 }
 
 function QuickTodoModal({ close, setTasks, initialTag = "" }) {
-  const defaultTodoTheme = { color: "#1769ff", tint: "#eff6ff" };
+  const defaultTodoTheme = realms[3] || { color: "#91aace", tint: "#fafbfd" };
   const [title, setTitle] = useState(""),
     [tag, setTag] = useState(initialTag),
     [selectedRealmName, setSelectedRealmName] = useState(() =>
       initialTag
         ? realms.find((r) => r.directions.includes(initialTag))?.name || ""
-        : "",
+        : realms[3]?.name || "",
     ),
     [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA")),
     [time, setTime] = useState(""),
@@ -3128,8 +3170,12 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
                 <option value="">不重复</option>
                 <option value="daily">每天</option>
                 <option value="weekdays">每个工作日</option>
+                <option value="weekends">每个周末</option>
                 <option value="weekly">每周</option>
+                <option value="biweekly">每两周</option>
                 <option value="monthly">每月</option>
+                <option value="quarterly">每季度</option>
+                <option value="yearly">每年</option>
               </select>
             </label>
           </div>
@@ -3696,8 +3742,18 @@ function ModalLayer({
   if (modal === "login") return <LoginModal close={close} />;
   if (modal === "addRealm")
     return <NewRealmModal close={close} onCreated={refresh} />;
-  if (modal === "addDirection")
-    return <AddDirectionModal close={close} onCreated={refresh} />;
+  if (modal === "addDirection" || modal?.startsWith("addDirection:"))
+    return (
+      <AddDirectionModal
+        close={close}
+        onCreated={refresh}
+        initialRealmName={
+          modal.includes(":")
+            ? decodeURIComponent(modal.slice(modal.indexOf(":") + 1))
+            : ""
+        }
+      />
+    );
   if (modal?.startsWith("content-"))
     return (
       <ContentDetailModal
@@ -3706,6 +3762,7 @@ function ModalLayer({
         setTasks={setTasks}
         openModal={openModal}
         close={close}
+        onDataChange={refresh}
         nested={depth > 0}
       />
     );
@@ -4046,8 +4103,11 @@ function ContentDetailModal({
   setTasks,
   openModal,
   close,
+  onDataChange,
   nested = false,
 }) {
+  const [editingTitle, setEditingTitle] = useState(false),
+    [titleDraft, setTitleDraft] = useState(item.title);
   const realm = realms.find((r) => r.name === item.realm),
     Icon = item.Icon,
     linkedTasks = tasks.filter((task) => task.tag === item.title),
@@ -4057,6 +4117,28 @@ function ContentDetailModal({
       (task) => task.matterStatus === "待安排",
     ),
     completedTasks = linkedTasks.filter((task) => task.done);
+  const saveTitle = () => {
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle || nextTitle === item.title) {
+      setTitleDraft(item.title);
+      setEditingTitle(false);
+      return;
+    }
+    const oldTitle = item.title;
+    item.title = nextTitle;
+    if (realm) {
+      realm.directions = realm.directions.map((title) =>
+        title === oldTitle ? nextTitle : title,
+      );
+    }
+    setTasks((current) =>
+      current.map((task) =>
+        task.tag === oldTitle ? { ...task, tag: nextTitle } : task,
+      ),
+    );
+    setEditingTitle(false);
+    onDataChange?.();
+  };
   return (
     <div
       className={`modal-backdrop content-detail-backdrop ${nested ? "nested-content-detail-backdrop" : ""}`}
@@ -4080,8 +4162,29 @@ function ContentDetailModal({
           <span>
             <Icon />
           </span>
-          <div>
-            <h2>{item.title}</h2>
+          <div className="content-title-edit-wrap">
+            {editingTitle ? (
+              <input
+                className="content-title-input"
+                value={titleDraft}
+                autoFocus
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveTitle();
+                  if (e.key === "Escape") setEditingTitle(false);
+                }}
+                onBlur={saveTitle}
+                aria-label="编辑事项名称"
+              />
+            ) : (
+              <button
+                className="content-title-button"
+                onClick={() => setEditingTitle(true)}
+                title="编辑事项名称"
+              >
+                <h2>{item.title}</h2>
+              </button>
+            )}
             <p>
               {item.realm} · {realm.note}
             </p>
@@ -4528,8 +4631,12 @@ function TodoEditModal({ task, setTasks, close, compact = false }) {
             <option value="">不重复</option>
             <option value="daily">每天</option>
             <option value="weekdays">每个工作日</option>
+            <option value="weekends">每个周末</option>
             <option value="weekly">每周</option>
+            <option value="biweekly">每两周</option>
             <option value="monthly">每月</option>
+            <option value="quarterly">每季度</option>
+            <option value="yearly">每年</option>
           </select>
         </label>
           </div>
@@ -4847,7 +4954,21 @@ function LinkedMatters({ openModal, tasks, refreshVersion }) {
     ),
     [draggedIndex, setDraggedIndex] = useState(null);
   useEffect(() => {
-    setOrderedMatters(matters.filter((item) => item.state === "点亮"));
+    setOrderedMatters((current) => {
+      const active = matters.filter((item) => item.state === "点亮"),
+        activeKeys = new Set(active.map((item) => `${item.realm}:${item.title}`)),
+        currentKeys = new Set(),
+        preserved = current.filter((item) => {
+          const key = `${item.realm}:${item.title}`;
+          if (!activeKeys.has(key) || currentKeys.has(key)) return false;
+          currentKeys.add(key);
+          return true;
+        }),
+        appended = active.filter(
+          (item) => !currentKeys.has(`${item.realm}:${item.title}`),
+        );
+      return [...preserved, ...appended];
+    });
   }, [refreshVersion]);
   const reorder = (from, to) => {
     if (from === null || from === to) return;
@@ -4913,9 +5034,12 @@ window
       applyAppearance(saved.theme || "自然", saved.density || "舒适", true);
   });
 createRoot(document.getElementById("root")).render(<App />);
-function AddDirectionModal({ close, onCreated }) {
+function AddDirectionModal({ close, onCreated, initialRealmName = "" }) {
   const [name, setName] = useState(""),
-    [realmIndex, setRealmIndex] = useState(0),
+    [realmIndex, setRealmIndex] = useState(() => {
+      const index = realms.findIndex((realm) => realm.name === initialRealmName);
+      return index >= 0 ? index : 0;
+    }),
     [kind, setKind] = useState("long"),
     selectedRealm = realms[realmIndex],
     SelectedIcon = name.trim() ? iconForMatterName(name) : selectedRealm.Icon;
