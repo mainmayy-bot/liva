@@ -2126,6 +2126,22 @@ function LoginModal({ close }) {
     [password, setPassword] = useState(""),
     [message, setMessage] = useState(""),
     [submitting, setSubmitting] = useState(false);
+  const signInWithGithub = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setMessage("尚未配置 Supabase。请在部署平台添加 Supabase 环境变量。");
+      return;
+    }
+    setSubmitting(true);
+    setMessage("");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) {
+      setSubmitting(false);
+      setMessage(error.message);
+    }
+  };
   const submit = async (e) => {
     e.preventDefault();
     if (!isSupabaseConfigured || !supabase) {
@@ -2200,6 +2216,15 @@ function LoginModal({ close }) {
             {submitting ? "正在连接…" : mode === "login" ? "登录并开始同步" : "注册并开始同步"}
           </button>
         </form>
+        <div className="login-divider"><span>或</span></div>
+        <button
+          className="login-github"
+          type="button"
+          onClick={signInWithGithub}
+          disabled={submitting}
+        >
+          <Cloud /> 使用 GitHub 登录
+        </button>
         {message && (
           <p className="login-status">
             <Cloud />
