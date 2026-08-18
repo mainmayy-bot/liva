@@ -2592,7 +2592,12 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
             <input
               aria-label="板块副标题"
               value={subtitle}
-              onChange={(e) => setSubtitle(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setSubtitle(next);
+                realm.note = next;
+                onDataChange?.();
+              }}
               onBlur={saveSubtitle}
               onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
               placeholder=""
