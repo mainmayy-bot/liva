@@ -4112,7 +4112,8 @@ function ContentDetailModal({
   nested = false,
 }) {
   const [editingTitle, setEditingTitle] = useState(false),
-    [titleDraft, setTitleDraft] = useState(item.title);
+    [titleDraft, setTitleDraft] = useState(item.title),
+    [draggedTaskId, setDraggedTaskId] = useState(null);
   const realm = realms.find((r) => r.name === item.realm),
     Icon = item.Icon,
     linkedTasks = tasks.filter((task) => task.tag === item.title),
@@ -4121,7 +4122,14 @@ function ContentDetailModal({
     pendingTasks = currentTasks.filter(
       (task) => task.matterStatus === "待安排",
     ),
-    completedTasks = linkedTasks.filter((task) => task.done);
+    completedTasks = linkedTasks.filter((task) => task.done),
+    orderedOpenTasks = [...activeTasks, ...pendingTasks].sort((a, b) => {
+      const key = (task) =>
+        task.date && task.clock
+          ? `${task.date}T${task.clock}`
+          : task.date || "9999-12-31T99:99";
+      return key(a).localeCompare(key(b));
+    });
   const saveTitle = () => {
     const nextTitle = titleDraft.trim();
     if (!nextTitle || nextTitle === item.title) {
@@ -4143,6 +4151,19 @@ function ContentDetailModal({
     );
     setEditingTitle(false);
     onDataChange?.();
+  };
+  const reorderTask = (targetId) => {
+    if (draggedTaskId === null || draggedTaskId === targetId) return;
+    setTasks((current) => {
+      const next = [...current],
+        from = next.findIndex((task) => task.id === draggedTaskId),
+        to = next.findIndex((task) => task.id === targetId);
+      if (from < 0 || to < 0) return current;
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setDraggedTaskId(null);
   };
   return (
     <div
@@ -4223,13 +4244,28 @@ function ContentDetailModal({
             </div>
             <div className="content-part-grid todo-link-grid">
               {activeTasks.length || pendingTasks.length ? (
-                [...activeTasks, ...pendingTasks].map((task) => (
-                  <MatterTaskCard
+                orderedOpenTasks.map((task) => (
+                  <div
+                    className="matter-task-drag-item"
                     key={task.id}
-                    task={task}
-                    setTasks={setTasks}
-                    openModal={openModal}
-                  />
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedTaskId(task.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      reorderTask(task.id);
+                    }}
+                    onDragEnd={() => setDraggedTaskId(null)}
+                  >
+                    <MatterTaskCard
+                      task={task}
+                      setTasks={setTasks}
+                      openModal={openModal}
+                    />
+                  </div>
                 ))
               ) : (
                 <div className="direction-todo-empty">
