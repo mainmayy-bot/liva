@@ -1138,7 +1138,7 @@ function TimelinePage({ navigate, openModal, tasks, setTasks }) {
   );
 }
 
-function Dashboard({ navigate, openModal, tasks, setTasks }) {
+function Dashboard({ navigate, openModal, tasks, setTasks, realmVersion }) {
   const [orderedRealms, setOrderedRealms] = useState(() => [...realms]);
   const [draggedRealm, setDraggedRealm] = useState(null);
   const reorderRealm = (to) => {
@@ -1198,7 +1198,11 @@ function Dashboard({ navigate, openModal, tasks, setTasks }) {
           </button>
         }
       >
-        <LinkedMatters openModal={openModal} tasks={tasks} />
+        <LinkedMatters
+          openModal={openModal}
+          tasks={tasks}
+          refreshVersion={realmVersion}
+        />
       </Section>
       <div id="today-plan">
         <PlanningBoard
@@ -1670,7 +1674,7 @@ function ProfilePage({ navigate, openModal }) {
     </div>
   );
 }
-function ProfilePanel({ close, openModal, tasks = [] }) {
+function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
   const [view, setView] = useState("home"),
     [density, setDensity] = useState(savedAppearance.density),
     [theme, setTheme] = useState(savedAppearance.theme),
@@ -1745,13 +1749,14 @@ function ProfilePanel({ close, openModal, tasks = [] }) {
             <span>M</span>
             <div>
               <b>May</b>
-              <small>登录后可在不同设备同步生活数据</small>
+            <small>{user ? user.email : "登录后可在不同设备同步生活数据"}</small>
             </div>
             <button
               className="profile-login-button"
-              onClick={() => openModal("login")}
+              onClick={() => !user && openModal("login")}
+              disabled={Boolean(user)}
             >
-              <LogIn /> 登录并同步
+              {user ? "已登录" : <><LogIn /> 登录并同步</>}
             </button>
           </section>
           {groups.map((group) => (
@@ -2108,8 +2113,8 @@ function ProfilePanel({ close, openModal, tasks = [] }) {
           </>
         )}
         <footer>
-          <button>
-            <UserRound /> 游客状态
+          <button onClick={user ? onSignOut : undefined}>
+            <UserRound /> {user ? "退出登录" : "游客状态"}
           </button>
           <button onClick={view === "home" ? close : () => setView("home")}>
             {view === "home" ? "返回今日" : "返回空间"} <ChevronRight />
@@ -2150,10 +2155,17 @@ function LoginModal({ close }) {
     }
     setSubmitting(true);
     setMessage("");
-    const result =
-      mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+    let result;
+    try {
+      result =
+        mode === "login"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({ email, password });
+    } catch (error) {
+      setSubmitting(false);
+      setMessage(error.message || "连接 Supabase 失败，请检查网络和项目配置。");
+      return;
+    }
     setSubmitting(false);
     if (result.error) {
       setMessage(result.error.message.includes("Invalid login credentials")
@@ -3628,6 +3640,8 @@ function ModalLayer({
   setNotificationReadIds,
   closeParentAndSelf,
   depth,
+  user,
+  onSignOut,
 }) {
   if (modal?.startsWith("todoEdit-")) {
     const task = tasks.find((t) => t.id === Number(modal.split("-")[1]));
@@ -3670,7 +3684,15 @@ function ModalLayer({
       />
     );
   if (modal === "profilePanel")
-    return <ProfilePanel close={close} openModal={openModal} tasks={tasks} />;
+    return (
+      <ProfilePanel
+        close={close}
+        openModal={openModal}
+        tasks={tasks}
+        user={user}
+        onSignOut={onSignOut}
+      />
+    );
   if (modal === "login") return <LoginModal close={close} />;
   if (modal === "addRealm")
     return <NewRealmModal close={close} onCreated={refresh} />;
@@ -3711,8 +3733,27 @@ function App() {
     [tasks, setTasks] = useState(initialTasks),
     [notificationReadIds, setNotificationReadIds] = useState([]),
     [sidebarCollapsed, setSidebarCollapsed] = useState(true),
-    [realmVersion, setRealmVersion] = useState(0);
+    [realmVersion, setRealmVersion] = useState(0),
+    [user, setUser] = useState(null);
   const [cloudReady, setCloudReady] = useState(!isSupabaseConfigured);
+  useEffect(() => {
+    if (!supabase) return;
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mounted) setUser(data.session?.user || null);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+      if (session?.user) window.dispatchEvent(new Event("liva-auth-changed"));
+    });
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+  const onSignOut = async () => {
+    if (supabase) await supabase.auth.signOut();
+  };
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let cancelled = false;
@@ -3820,6 +3861,7 @@ function App() {
         openModal={openModal}
         tasks={tasks}
         setTasks={setTasks}
+        realmVersion={realmVersion}
       />
     );
   const refresh = () => setRealmVersion((v) => v + 1);
@@ -3861,6 +3903,8 @@ function App() {
               setModalStack((stack) => stack.slice(0, Math.max(0, index - 1)))
             }
             depth={index}
+            user={user}
+            onSignOut={onSignOut}
           />
         </div>
       ))}
@@ -4797,11 +4841,14 @@ function NewRealmModal({ close, onCreated }) {
     </div>
   );
 }
-function LinkedMatters({ openModal, tasks }) {
+function LinkedMatters({ openModal, tasks, refreshVersion }) {
   const [orderedMatters, setOrderedMatters] = useState(() =>
       matters.filter((item) => item.state === "点亮"),
     ),
     [draggedIndex, setDraggedIndex] = useState(null);
+  useEffect(() => {
+    setOrderedMatters(matters.filter((item) => item.state === "点亮"));
+  }, [refreshVersion]);
   const reorder = (from, to) => {
     if (from === null || from === to) return;
     setOrderedMatters((current) => {
