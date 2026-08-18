@@ -1449,6 +1449,162 @@
   }
 }
 
+/* Mobile realm detail: lighter hierarchy and more breathing room. */
+@media (max-width: 800px) {
+  .realm-backdrop .refined-realm-modal > header {
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 12px;
+    padding: 34px 22px 18px;
+  }
+
+  .realm-backdrop .refined-realm-modal > header > span {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+  }
+
+  .realm-backdrop .refined-realm-modal > header > span svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .realm-backdrop .realm-head-copy {
+    padding-right: 52px;
+  }
+
+  .realm-backdrop .realm-head-copy h2 {
+    font-size: 22px;
+    letter-spacing: -.02em;
+  }
+
+  .realm-backdrop .realm-head-copy input {
+    margin-top: 4px;
+    font-size: 10px;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin: 12px 0 0 !important;
+    padding: 8px 0 !important;
+    background: color-mix(in srgb, var(--t) 38%, #fff) !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article {
+    min-width: 0 !important;
+    flex: 1;
+    justify-content: center;
+    gap: 5px !important;
+    padding: 2px 8px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article + article {
+    border-left: 1px solid color-mix(in srgb, var(--c) 12%, #e6ebe8) !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article b {
+    font-size: 16px !important;
+    font-weight: 650 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article span {
+    font-size: 8px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-body {
+    padding: 25px 22px 27px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title {
+    margin-bottom: 16px;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title h3 {
+    font-size: 16px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title p {
+    max-width: 24ch;
+    margin-top: 5px;
+    font-size: 9px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title > button {
+    min-width: 0;
+    min-height: 36px;
+    border-radius: 11px;
+    padding: 0 11px;
+    font-size: 9px;
+    box-shadow: 0 5px 14px color-mix(in srgb, var(--c) 12%, transparent);
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title > button svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid {
+    gap: 11px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article {
+    min-height: 158px !important;
+    border-color: #e5ebe7;
+    border-radius: 16px;
+    background: #fff !important;
+    padding: 14px !important;
+    box-shadow: none;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-icon {
+    width: 38px;
+    height: 38px;
+    margin-bottom: 13px;
+    border-radius: 50%;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-icon svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid h4 {
+    font-size: 13px !important;
+    font-weight: 650;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article > p {
+    min-height: 0;
+    margin: 7px 0 0;
+    font-size: 8px !important;
+    line-height: 1.5;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-state {
+    top: 12px;
+    right: 11px;
+    padding: 3px 6px;
+    font-size: 7px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid footer {
+    right: 14px;
+    bottom: 12px;
+    left: 14px;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid footer small {
+    font-size: 7px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid footer button {
+    width: 24px;
+    height: 24px;
+    border-color: transparent;
+    background: #f7faf8;
+  }
+}
+
 /* New todo keeps the desktop field model on mobile; only the layout adapts. */
 @media (max-width: 800px) {
   .quick-todo-backdrop:not(.tertiary-todo-backdrop) .quick-mobile-actions {

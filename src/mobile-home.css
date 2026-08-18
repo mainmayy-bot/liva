@@ -167,10 +167,10 @@
     font-size: 9px;
   }
 
-  .mobile-overview-stats .completion-card strong,
-  .mobile-overview-stats button:nth-child(3) strong {
-    color: #6f957e;
-  }
+  .mobile-overview-stats button:nth-child(1) strong { color: #cc8662; }
+  .mobile-overview-stats button:nth-child(2) strong { color: #6f957e; }
+  .mobile-overview-stats button:nth-child(3) strong { color: #6f91c4; }
+  .mobile-overview-stats button:nth-child(4) strong { color: #9a7db5; }
 
   .completion-card i {
     position: absolute;

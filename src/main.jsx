@@ -60,6 +60,7 @@ import {
   isSupabaseConfigured,
   loadCloudSnapshot,
   saveCloudSnapshot,
+  supabase,
 } from "./lib/supabase";
 
 function applyAppearance(theme, density, followSystem = false) {
@@ -2123,12 +2124,33 @@ function LoginModal({ close }) {
   const [mode, setMode] = useState("login"),
     [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
-    [message, setMessage] = useState("");
-  const submit = (e) => {
+    [message, setMessage] = useState(""),
+    [submitting, setSubmitting] = useState(false);
+  const submit = async (e) => {
     e.preventDefault();
-    setMessage(
-      "登录界面已就绪，填入 Supabase 项目地址与公开密钥后即可启用真实同步。",
-    );
+    if (!isSupabaseConfigured || !supabase) {
+      setMessage("尚未配置 Supabase。请在部署平台添加 VITE_SUPABASE_URL 和 VITE_SUPABASE_PUBLISHABLE_KEY。");
+      return;
+    }
+    setSubmitting(true);
+    setMessage("");
+    const result =
+      mode === "login"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
+    setSubmitting(false);
+    if (result.error) {
+      setMessage(result.error.message.includes("Invalid login credentials")
+        ? "邮箱或密码不正确，请检查后重试。"
+        : result.error.message);
+      return;
+    }
+    if (mode === "signup" && !result.data.session) {
+      setMessage("注册成功。请先打开邮箱中的确认链接，再回来登录。\n");
+      return;
+    }
+    window.dispatchEvent(new Event("liva-auth-changed"));
+    close();
   };
   return (
     <div className="modal-backdrop login-backdrop" onClick={close}>
@@ -2173,9 +2195,9 @@ function LoginModal({ close }) {
               />
             </div>
           </label>
-          <button className="login-submit" type="submit">
+          <button className="login-submit" type="submit" disabled={submitting}>
             <LogIn />
-            {mode === "login" ? "登录并开始同步" : "注册并开始同步"}
+            {submitting ? "正在连接…" : mode === "login" ? "登录并开始同步" : "注册并开始同步"}
           </button>
         </form>
         {message && (
@@ -3698,6 +3720,21 @@ function App() {
     );
     return () => window.clearTimeout(timer);
   }, [tasks, realmVersion, cloudReady]);
+  useEffect(() => {
+    const reloadAfterAuth = () => {
+      loadCloudSnapshot()
+        .then((snapshot) => {
+          if (snapshot?.tasks) setTasks(snapshot.tasks);
+          if (snapshot) {
+            restoreCloudState(snapshot);
+            setRealmVersion((v) => v + 1);
+          }
+        })
+        .catch((error) => console.warn("Supabase sync skipped:", error.message));
+    };
+    window.addEventListener("liva-auth-changed", reloadAfterAuth);
+    return () => window.removeEventListener("liva-auth-changed", reloadAfterAuth);
+  }, []);
   const openModal = React.useCallback((next) => {
     if (!next) return;
     setModalStack((stack) => [...stack, next]);
