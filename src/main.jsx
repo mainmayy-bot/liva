@@ -141,7 +141,7 @@ function persistInspirationMemos(next) {
 const realms = [
   {
     name: "Fortune",
-    note: "事业与财富",
+    note: "财富与事业",
     Icon: BriefcaseBusiness,
     color: "#d8ad60",
     tint: "#fffdfa",
@@ -151,7 +151,7 @@ const realms = [
   },
   {
     name: "Beauty",
-    note: "身体与美感",
+    note: "身材与美貌",
     Icon: Heart,
     color: "#dda2a4",
     tint: "#fffafb",
@@ -161,7 +161,7 @@ const realms = [
   },
   {
     name: "Soul",
-    note: "精神世界",
+    note: "生活方式与体验",
     Icon: Leaf,
     color: "#91b39a",
     tint: "#fafcfb",
