@@ -347,3 +347,42 @@ html[data-density="relaxed"] .profile-subpage { gap: 18px; padding-block: 18px; 
 @media (max-width: 520px) {
   .refined-realm-modal .direction-profile-grid { grid-template-columns: 1fr; }
 }
+
+/* Todo creation is always a neutral white action surface, independent of theme. */
+.quick-todo-backdrop > .quick-todo-modal.refined-quick-todo:not(.unified-todo-edit) {
+  background: #fff !important;
+  border-color: #dfe6e2 !important;
+}
+
+/* Secondary action surfaces stay neutral white in every appearance theme. */
+:is(.modal,.quick-todo-modal,.realm-modal,.content-detail-modal,.notification-panel,.login-modal,.inspiration-modal,.realm-create-modal,.direction-create,.delete-confirm-modal,.profile-edit-modal) {
+  background: #fff !important;
+  background-image: none !important;
+}
+:is(.realm-modal,.content-detail-modal,.notification-panel,.login-modal,.inspiration-modal,.realm-create-modal,.direction-create,.profile-edit-modal) > header {
+  background: #fff !important;
+  background-image: none !important;
+}
+
+.recent-matter-filter { border: 1px solid #e5eae7; border-radius: 15px; background: #fff; padding: 14px; }
+.recent-matter-filter > header { margin-bottom: 11px; }
+.recent-matter-filter h3 { margin: 0; font-size: 14px; }
+.recent-matter-filter header p { margin: 4px 0 0; color: #7f8a84; font-size: 10px; line-height: 1.45; }
+.record-realm-filters { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 9px; }
+.record-realm-filters button { flex: none; min-height: 30px; border: 1px solid #e1e6e3; border-radius: 999px; background: #fff; padding: 6px 11px; color: #68746e; font-size: 10px; }
+.record-realm-filters button.active { border-color: color-mix(in srgb,var(--c,#7ea08b) 38%,#dfe5e2); background: var(--t,#eef5f0); color: var(--c,#648b72); font-weight: 600; }
+.recent-matter-list { display: grid; max-height: 292px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.recent-matter-list > button { display: grid; grid-template-columns: 38px minmax(0,1fr) 15px; align-items: center; gap: 11px; min-height: 62px; border: 0; border-top: 1px solid #edf0ee; background: transparent; padding: 11px 0; text-align: left; }
+.recent-matter-list > button > span { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; background: var(--t); color: var(--c); }
+.recent-matter-list > button > span svg { width: 17px; height: 17px; }
+.recent-matter-list > button > div { display: grid; gap: 3px; min-width: 0; }
+.recent-matter-list b { overflow: hidden; color: #35423b; font-size: 12px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.recent-matter-list small { color: #7f8a84; font-size: 9px; line-height: 1.4; }
+.recent-matter-list > button > svg { width: 14px; color: #929d97; }
+.profile-panel .profile-subpage .space-section h3 { font-size: 14px; }
+.profile-panel .profile-subpage .space-section header p { font-size: 10px; line-height: 1.45; }
+.profile-panel .profile-subpage .space-section > header > button { font-size: 10px; }
+.profile-panel .profile-subpage .record-timeline article { grid-template-columns: 14px 1fr; gap: 10px; padding-bottom: 17px; }
+.profile-panel .profile-subpage .record-timeline time { font-size: 9px; }
+.profile-panel .profile-subpage .record-timeline b { font-size: 12px; line-height: 1.4; }
+.profile-panel .profile-subpage .record-timeline p { color: #737f79; font-size: 10px; line-height: 1.55; }

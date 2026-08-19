@@ -179,7 +179,8 @@
     width: 34px;
     height: 34px;
     border-radius: 50%;
-    background: conic-gradient(var(--mobile-accent) var(--progress), #e8eeea 0);
+    border: 5px solid #bfe6ce;
+    background: #f4fbf7;
   }
 
   .completion-card i::after {
@@ -616,9 +617,8 @@
     place-content: center;
     justify-self: center;
     border-radius: 50%;
-    border: 1px solid #edf1ef;
-    background:
-      conic-gradient(from -90deg, #73a888 0 var(--progress), #e8eeea var(--progress) 360deg);
+    border: 9px solid #73b48d;
+    background: #edf7f1;
     box-shadow:
       inset 0 0 0 1px rgba(255, 255, 255, .72),
       0 8px 22px rgba(70, 99, 83, .07);
@@ -630,7 +630,7 @@
     inset: 10px;
     border-radius: inherit;
     border: 1px solid rgba(225, 233, 228, .85);
-    background: linear-gradient(145deg, #fff, #fafcfb);
+    background: #fff;
     box-shadow: inset 0 2px 8px rgba(76, 103, 89, .035);
     content: "";
   }
@@ -740,7 +740,7 @@
   }
 
   .todo-page-shell .todo-layout > .panel > .section-head h2::after {
-    content: "今日重点";
+    content: "今日概览";
     font-size: 11px;
     letter-spacing: 0;
   }

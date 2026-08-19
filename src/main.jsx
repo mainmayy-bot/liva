@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { createContext, useContext } from "react";
 import {
   Archive,
   Bell,
@@ -62,6 +63,7 @@ import {
   saveCloudSnapshot,
   supabase,
 } from "./lib/supabase";
+import { layoutTimelineItems } from "./lib/timeline-layout";
 
 function applyAppearance(theme, density, followSystem = false) {
   const prefersDark = window.matchMedia?.(
@@ -99,6 +101,20 @@ const savedAppearance = (() => {
     return { theme: "自然", density: "舒适", followSystem: false };
   }
 })();
+const defaultProfile = {
+  name: "May",
+  initials: "M",
+  bio: "把生活整理成自己喜欢的样子",
+};
+const savedProfile = (() => {
+  try {
+    return { ...defaultProfile, ...JSON.parse(localStorage.getItem("liva-profile")) };
+  } catch {
+    return defaultProfile;
+  }
+})();
+const ProfileContext = createContext({ profile: savedProfile, saveProfile: () => {} });
+const useLivaProfile = () => useContext(ProfileContext);
 const defaultInspirationMemos = [
   {
     id: 1,
@@ -177,9 +193,19 @@ const realms = [
     tint: "#fafbfd",
     intro:
       "承接生活里必要但琐碎的部分。日程、家务、资料与关系维护，让生活运行得更轻松。",
-    directions: ["日程整理", "空间维护", "资料归档", "关系联络"],
+    directions: ["日程整理", "空间维护", "资料归档", "关系联络", "临时代办事项"],
   },
 ];
+const defaultRealmNotes = {
+  Fortune: "财富与事业",
+  Beauty: "身材与美貌",
+  Soul: "生活方式与体验",
+  Admin: "日常运营",
+};
+function getRealmNote(realm) {
+  const note = String(realm?.note ?? "").trim();
+  return /^\d+$/.test(note) ? defaultRealmNotes[realm?.name] || note : note;
+}
 const initialTasks = [
   {
     id: 1,
@@ -252,7 +278,23 @@ function taskOccursOnDate(task, dateKey) {
   if (task.repeat === "weekdays") return target.getDay() >= 1 && target.getDay() <= 5;
   if (task.repeat === "weekends") return target.getDay() === 0 || target.getDay() === 6;
   if (task.repeat === "weekly") return days % 7 === 0;
-  if (task.repeat === "biweekly") return days % 14 === 0;
+  if (task.repeat === "custom") {
+    const interval = Math.max(1, Number(task.repeatInterval) || 1),
+      unit = task.repeatUnit || "day";
+    if (task.repeatMode === "weekdays")
+      return Array.isArray(task.repeatWeekdays) && task.repeatWeekdays.includes(target.getDay());
+    if (unit === "week") {
+      if (Array.isArray(task.repeatWeekdays) && task.repeatWeekdays.length)
+        return Math.floor(days / 7) % interval === 0 && task.repeatWeekdays.includes(target.getDay());
+      return days % (interval * 7) === 0;
+    }
+    if (unit === "month") {
+      const months = (target.getFullYear() - start.getFullYear()) * 12 + target.getMonth() - start.getMonth();
+      return target.getDate() === start.getDate() && months % interval === 0;
+    }
+    if (unit === "year") return target.getDate() === start.getDate() && target.getMonth() === start.getMonth() && (target.getFullYear() - start.getFullYear()) % interval === 0;
+    return days % interval === 0;
+  }
   if (task.repeat === "monthly") return target.getDate() === start.getDate();
   if (task.repeat === "quarterly")
     return target.getDate() === start.getDate() &&
@@ -268,9 +310,8 @@ function repeatLabel(value) {
     weekdays: "每个工作日",
     weekends: "每个周末",
     weekly: "每周",
-    biweekly: "每两周",
+    custom: "自定义",
     monthly: "每月",
-    quarterly: "每季度",
     yearly: "每年",
   }[value] || "不重复";
 }
@@ -304,28 +345,34 @@ const matters = realms.flatMap((realm) =>
   realm.directions.map((title, index) => ({
     title,
     realm: realm.name,
-    state: directionStates[index],
-    kind: matterKinds[index],
-    note: directionNotes[index],
+    state: directionStates[index % directionStates.length],
+    kind: matterKinds[index % matterKinds.length],
+    note: directionNotes[index % directionNotes.length],
     Icon: iconForMatterName(title),
     todos: initialTasks.filter((task) => task.tag === title),
   })),
 );
+function realmForTask(task) {
+  const linkedMatter = matters.find((item) => item.title === task?.tag),
+    realmName = task?.realm || linkedMatter?.realm;
+  return realms.find((realm) => realm.name === realmName) ||
+    realms.find((realm) => realm.directions.includes(task?.tag)) ||
+    realms[3];
+}
 
-function Header({ title = "下午好， May", mobileTitle, openModal, navigate }) {
+function Header({ title, mobileTitle, openModal, navigate }) {
+  const { profile } = useLivaProfile(),
+    resolvedTitle = title || `下午好， ${profile.name}`;
   return (
     <header className="topbar">
       <div>
         <p className="hello">
           {mobileTitle ? (
             <>
-              <span className="header-title-default">{title}</span>
+              <span className="header-title-default">{resolvedTitle}</span>
               <span className="header-title-mobile">{mobileTitle}</span>
             </>
-          ) : title}{" "}
-          <span className="wave" aria-hidden="true">
-            🌿
-          </span>
+          ) : resolvedTitle}
         </p>
         <p className="today">今天是 2026年8月11日，星期二</p>
       </div>
@@ -354,7 +401,7 @@ function Header({ title = "下午好， May", mobileTitle, openModal, navigate }
           onClick={() => openModal("profilePanel")}
           aria-label="个人资料"
         >
-          M
+          {profile.initials}
         </button>
       </div>
     </header>
@@ -381,7 +428,7 @@ function Section({ title, sub, action, children, className = "", id }) {
 }
 function RealmCard({ realm, index, openModal, matters }) {
   const Icon = realm.Icon,
-    matterCount = matters.filter((matter) => matter.realm === realm.name).length,
+    matterCount = matters.filter((matter) => matter.realm === realm.name && !matter.archived).length,
     show = () => {
       window.__boardOpenModal = openModal;
       openModal(`realmModal-${index}`);
@@ -389,6 +436,7 @@ function RealmCard({ realm, index, openModal, matters }) {
   return (
     <article
       className="realm"
+      data-realm={realm.name}
       onClick={show}
       style={{ "--c": realm.color, "--t": realm.tint }}
     >
@@ -398,7 +446,7 @@ function RealmCard({ realm, index, openModal, matters }) {
         </span>
         <div>
           <h3>{realm.name}</h3>
-          <p>{realm.note}</p>
+          <p>{getRealmNote(realm)}</p>
         </div>
       </div>
       <p className="project-count">
@@ -428,6 +476,7 @@ function MatterCard({ item, index, openModal, tasks }) {
   return (
     <article
       className="goal content-card"
+      data-realm={realm.name}
       onClick={() => openModal(`content-${index}`)}
       role="button"
       tabIndex="0"
@@ -463,8 +512,23 @@ function TodoList({ tasks, setTasks, openModal, full = false }) {
   return (
     <>
       <div className="tasks">
-        {tasks.map((t) => (
-          <article className={`${t.done ? "done" : ""} ${deleting.includes(t.id) ? "is-deleting" : ""}`} key={t.id}>
+        {tasks.length === 0 && (
+          <div className="todo-empty-state">
+            <span aria-hidden="true">
+              <CheckCircle2 />
+            </span>
+            <b>今日暂无待办</b>
+            <p>今天还没有需要处理的事情，可以轻松一点。</p>
+          </div>
+        )}
+        {tasks.map((t) => {
+          const realm = realmForTask(t);
+          return <article
+            className={`${t.done ? "done" : ""} ${deleting.includes(t.id) ? "is-deleting" : ""}`}
+            data-realm={realm.name}
+            style={{ "--task-color": realm.color, "--task-tint": realm.tint }}
+            key={t.id}
+          >
             <GripVertical className="drag" />
             <button
               className="task-check"
@@ -496,12 +560,14 @@ function TodoList({ tasks, setTasks, openModal, full = false }) {
             >
               <X />
             </button>
-          </article>
-        ))}
+          </article>;
+        })}
       </div>
-      <button className="add-todo" onClick={() => openModal("addTodo")}>
-        <Plus /> 添加待办
-      </button>
+      {tasks.length > 0 && (
+        <button className="add-todo" onClick={() => openModal("addTodo")}>
+          <Plus /> 添加待办
+        </button>
+      )}
       {!full && (
         <button className="more-page" onClick={() => openModal("gotoTodo")}>
           进入待办页面 <ChevronRight />
@@ -602,11 +668,12 @@ function ScheduleTodoPanel({
     <div className="tasks">
       {items.map((t) => {
         const arranged = scheduled.some((s) => s.taskId === t.id),
-          realm = realms.find((r) => r.directions.includes(t.tag)),
+          realm = realmForTask(t),
           isCompleting = completing.includes(t.id);
         return (
           <article
             className={`${arranged ? "arranged " : ""}${isCompleting ? "is-completing" : ""}${deleting.includes(t.id) ? " is-deleting" : ""}`}
+            data-realm={realm.name}
             style={{
               "--task-color": realm?.color || "#8fa39a",
               "--task-tint": realm?.tint || "#f2f5f3",
@@ -626,6 +693,10 @@ function ScheduleTodoPanel({
                 const source = JSON.parse(
                   e.dataTransfer.getData("text/plain"),
                 );
+                if (items === anytime && isTimed(t)) {
+                  moveToAnytime(e);
+                  return;
+                }
                 reorderTask(source.id, t.id);
               } catch {}
             }}
@@ -731,14 +802,12 @@ function ScheduleTodoPanel({
       </div>
       <div className="dashboard-task-scroll grouped-task-scroll">
         <Cards items={progress} />
-        <div
-          className="anytime-heading"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={moveToAnytime}
-        >
-          <span>随时待办</span>
+        <div className="anytime-drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={moveToAnytime}>
+          <div className="anytime-heading">
+            <span>随时待办</span>
+          </div>
+          <Cards items={anytime} />
         </div>
-        <Cards items={anytime} />
       </div>
       {completed.length > 0 && (
         <details className="completed-task-window">
@@ -790,7 +859,7 @@ function ScheduleTodoPanel({
   );
 }
 function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = false }) {
-  const slotHeight = 64,
+  const slotHeight = window.matchMedia?.("(max-width: 800px)").matches ? 48 : 64,
     hours = Array.from({ length: 24 }, (_, i) => i),
     scroller = useRef(null),
     datePicker = useRef(null),
@@ -886,6 +955,13 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
       focusNow();
     };
   const dayScheduled = scheduled.filter((s) => s.dateKey === selectedKey),
+    timelineLayout = layoutTimelineItems(dayScheduled),
+    formatTimelineClock = (start) => {
+      const totalMinutes = Math.round(Number(start) * 60),
+        hour = Math.floor(totalMinutes / 60),
+        minute = totalMinutes % 60;
+      return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    },
     drop = (e, hour) => {
       e.preventDefault();
       try {
@@ -909,7 +985,7 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
                 },
               ],
         );
-        const clock = `${String(hour).padStart(2, "0")}:00`;
+        const clock = formatTimelineClock(hour);
         setTasks((current) =>
           current.map((item) =>
             item.id === t.id
@@ -953,9 +1029,8 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
     document.addEventListener("mouseup", up);
   };
   const toneFor = (s) => {
-    const task = tasks.find((t) => t.id === s.taskId),
-      realm = realms.find((r) => r.directions.includes(task?.tag));
-    return realm || realms[3];
+    const task = tasks.find((t) => t.id === s.taskId);
+    return realmForTask(task);
   };
   const dateControls = (
     <div className="axis-date-controls">
@@ -1001,14 +1076,25 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
         action={dateControls}
       >
         <div className="axis-scroll" ref={scroller}>
-          <div className="axis-grid">
+          <div
+            className="axis-grid"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            }}
+            onDrop={(e) => {
+              const block = e.target.closest?.(".scheduled-block"),
+                blockStart = Number(block?.dataset.start),
+                bounds = e.currentTarget.getBoundingClientRect(),
+                pointerStart = Math.round(((e.clientY - bounds.top) / slotHeight) * 2) / 2,
+                targetStart = Number.isFinite(blockStart)
+                  ? blockStart
+                  : Math.max(0, Math.min(23.5, pointerStart));
+              drop(e, targetStart);
+            }}
+          >
             {hours.map((h) => (
-              <div
-                className="hour-row"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => drop(e, h)}
-                key={h}
-              >
+              <div className={`hour-row ${h === 23 ? "last-hour-row" : ""}`} key={h}>
                 <time>{String(h).padStart(2, "0")}:00</time>
                 <i />
               </div>
@@ -1025,15 +1111,24 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
               </div>
             )}
             {dayScheduled.map((s) => {
-              const tone = toneFor(s);
+              const tone = toneFor(s),
+                { lane: laneIndex = 0, laneCount = 1 } =
+                  timelineLayout.get(s.id) || {},
+                laneLeft = (laneIndex / laneCount) * 100,
+                laneWidth = 100 / laneCount;
               return (
                 <article
                   className="scheduled-block"
+                  data-start={s.start}
+                  data-realm={tone.name}
                   style={{
                     top: s.start * slotHeight + 2,
                     height: s.duration * slotHeight - 4,
                     "--schedule-color": tone.color,
                     "--schedule-tint": tone.tint,
+                    left: `calc(48px + ${laneLeft}% - ${(laneLeft * 52) / 100}px)`,
+                    right: "auto",
+                    width: `calc(${laneWidth}% - ${52 / laneCount + 4}px)`,
                   }}
                   draggable
                   onDragStart={(e) => {
@@ -1046,7 +1141,7 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
                 >
                   <b>{s.title}</b>
                   <small>
-                    {String(s.start).padStart(2, "0")}:00 · {s.duration}小时
+                    {formatTimelineClock(s.start)} · {s.duration}小时
                   </small>
                   <button
                     className="resize-handle"
@@ -1072,6 +1167,51 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
     </div>
   );
 }
+function repeatChange(event, setRepeat, setRepeatInterval) {
+  const value = event.target.value;
+  if (value === "custom") setRepeatInterval((current) => current || 2);
+  setRepeat(value);
+}
+function CustomRepeatFields({ interval, setInterval, unit, setUnit, weekdays, setWeekdays, mode, setMode }) {
+  const weekNames = ["一", "二", "三", "四", "五", "六", "日"],
+    weekDays = [1, 2, 3, 4, 5, 6, 0];
+  return (
+    <div className="custom-repeat-fields">
+      <div className="custom-repeat-mode">
+        <button type="button" className={mode !== "weekdays" ? "active" : ""} onClick={() => setMode("interval")}>按间隔</button>
+        <button type="button" className={mode === "weekdays" ? "active" : ""} onClick={() => { setMode("weekdays"); if (!weekdays.length) setWeekdays([new Date().getDay()]); }}>按星期</button>
+      </div>
+      {mode !== "weekdays" ? <div className="custom-repeat-interval">
+        <span>每</span>
+        <input type="number" min="1" step="1" value={interval} onChange={(e) => setInterval(Math.max(1, Number(e.target.value) || 1))} aria-label="重复间隔" />
+        <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="重复单位">
+          <option value="day">天</option><option value="week">周</option><option value="month">月</option><option value="year">年</option>
+        </select>
+      </div> : <div className="custom-repeat-weekdays">
+        {weekNames.map((name, index) => {
+          const day = weekDays[index];
+          return <button type="button" className={weekdays.includes(day) ? "active" : ""} onClick={() => setWeekdays(weekdays.includes(day) ? weekdays.filter((v) => v !== day) : [...weekdays, day])} key={day}>{name}</button>;
+        })}
+      </div>}
+    </div>
+  );
+}
+function CircularProgress({ value, className = "" }) {
+  const progress = Math.max(0, Math.min(100, Number(value) || 0));
+  return (
+    <svg className={`circular-progress ${className}`} viewBox="0 0 120 120" aria-hidden="true">
+      <circle className="circular-progress-track" cx="60" cy="60" r="51" pathLength="100" />
+      <circle
+        className="circular-progress-value"
+        cx="60"
+        cy="60"
+        r="51"
+        pathLength="100"
+        strokeDasharray={`${progress} 100`}
+      />
+    </svg>
+  );
+}
 function MobileOverview({ tasks, openModal, navigate }) {
   const active = tasks.filter((t) => !t.done && !t.archived),
     done = tasks.filter((t) => t.done && !t.archived),
@@ -1094,22 +1234,27 @@ function MobileOverview({ tasks, openModal, navigate }) {
           <span>今日待办</span>
           <strong>{active.length}</strong>
           <small>正在推进</small>
+          <i className="overview-card-mark" aria-hidden="true"><CheckCircle2 /></i>
         </button>
         <button className="completion-card" onClick={() => jumpTo("daily-review")}>
           <span>完成进度</span>
           <strong>{completion}%</strong>
           <small>{done.length} 项已完成</small>
-          <i style={{ "--progress": `${completion * 3.6}deg` }} aria-hidden="true" />
+          <i className="overview-card-mark completion-progress" aria-hidden="true">
+            <CircularProgress value={completion} />
+          </i>
         </button>
         <button onClick={() => navigate("timeline")}>
           <span>时间轴</span>
           <strong>{scheduled.length}</strong>
           <small>个日程安排</small>
+          <i className="overview-card-mark" aria-hidden="true"><CalendarDays /></i>
         </button>
         <button onClick={() => jumpTo("life-content")}>
           <span>事项习惯</span>
           <strong>{matters.length}</strong>
           <small>个生活事项</small>
+          <i className="overview-card-mark" aria-hidden="true"><ListChecks /></i>
         </button>
       </div>
       <button className="mobile-capture" onClick={() => openModal("addTodo")}>
@@ -1139,7 +1284,8 @@ function TimeCompass({ tasks }) {
         <h2>今日概览</h2>
       </header>
       <div className="time-compass-body">
-        <div className="time-compass-ring" style={{ "--progress": `${percent * 3.6}deg` }}>
+        <div className="time-compass-ring">
+          <CircularProgress value={percent} className="time-compass-progress" />
           <strong>{hourLabel(arrangedHours)}</strong>
           <span>已安排</span>
         </div>
@@ -1267,14 +1413,14 @@ function MapPage({ navigate, openModal }) {
         {realms.map((r, i) => {
           const Icon = r.Icon;
           return (
-            <article style={{ "--c": r.color, "--t": r.tint }} key={r.name}>
+            <article data-realm={r.name} style={{ "--c": r.color, "--t": r.tint }} key={r.name}>
               <header>
                 <span>
                   <Icon />
                 </span>
                 <div>
                   <h2>{r.name}</h2>
-                  <p>{r.note}</p>
+                  <p>{getRealmNote(r)}</p>
                 </div>
                 <button onClick={() => navigate(`realm-${i}`)}>
                   <ChevronRight />
@@ -1311,7 +1457,7 @@ function RealmPage({ realm, navigate, openModal }) {
     setDraggedDirection(null);
   };
   return (
-    <div className="focus-page realm-focus-page" style={{ "--c": realm.color, "--t": realm.tint }}>
+    <div className="focus-page realm-focus-page" data-realm={realm.name} style={{ "--c": realm.color, "--t": realm.tint }}>
       <Header title={realm.name} openModal={openModal} navigate={navigate} />
       <button className="back" onClick={() => navigate("map")}>
         <ChevronLeft /> 返回版图
@@ -1323,7 +1469,7 @@ function RealmPage({ realm, navigate, openModal }) {
         <span>
           <Icon />
         </span>
-        <p>{realm.note}</p>
+        <p>{getRealmNote(realm)}</p>
         <h1>{realm.intro}</h1>
       </section>
       <Section
@@ -1370,13 +1516,25 @@ function RealmPage({ realm, navigate, openModal }) {
     </div>
   );
 }
-function MattersPage({ navigate, openModal }) {
-  const [orderedMatters, setOrderedMatters] = useState(() => matters.filter((item) => item.state === "点亮"));
-  const [draggedMatter, setDraggedMatter] = useState(null);
-  const reorderMatter = (to) => {
-    if (draggedMatter === null || draggedMatter === to) return;
+function MattersPage({ navigate, openModal, tasks = [] }) {
+  const [orderedMatters, setOrderedMatters] = useState(() => matters.filter((item) => item.state === "点亮" && !item.archived));
+  const [draggedMatter, setDraggedMatter] = useState(null),
+    [activeRealm, setActiveRealm] = useState("全部"),
+    visibleMatters = activeRealm === "全部"
+      ? orderedMatters
+      : orderedMatters.filter((item) => item.realm === activeRealm),
+    matterId = (item) => `${item.realm}:${item.title}`,
+    routineMatters = matters.filter((item) => item.kind === "日常习惯" && !item.archived),
+    recentMemos = inspirationMemos.slice(0, 3);
+  const reorderMatter = (targetMatter) => {
+    const targetId = matterId(targetMatter);
+    if (draggedMatter === null || draggedMatter === targetId) return;
     setOrderedMatters((current) => {
-      const next = [...current], [moved] = next.splice(draggedMatter, 1);
+      const next = [...current],
+        from = next.findIndex((item) => matterId(item) === draggedMatter),
+        to = next.findIndex((item) => matterId(item) === targetId);
+      if (from < 0 || to < 0) return current;
+      const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
       return next;
     });
@@ -1385,6 +1543,9 @@ function MattersPage({ navigate, openModal }) {
   return (
     <div className="focus-page matters-focus-page">
       <Header title="事项与日常" openModal={openModal} navigate={navigate} />
+      <button className="back matters-page-back" onClick={() => navigate("today")}>
+        <ChevronLeft /> 返回首页
+      </button>
       <div className="page-intro compact life-intro">
         <span>生活近况</span>
         <h1>整理正在发生的生活。</h1>
@@ -1410,13 +1571,10 @@ function MattersPage({ navigate, openModal }) {
         </p>
       </section>
       <div className="filter-row life-filters">
-        <button className="active">全部</button>
+        <button className={activeRealm === "全部" ? "active" : ""} aria-pressed={activeRealm === "全部"} onClick={() => setActiveRealm("全部")}>全部</button>
         {realms.map((r) => (
-          <button key={r.name}>{r.name}</button>
+          <button style={{ "--filter-color": r.color }} className={activeRealm === r.name ? "active" : ""} aria-pressed={activeRealm === r.name} onClick={() => setActiveRealm(r.name)} key={r.name}>{r.name}</button>
         ))}
-        <button className="outline push" onClick={() => openModal("addMatter")}>
-          <Plus /> 添加事项
-        </button>
       </div>
       <div className="life-management">
         <main>
@@ -1430,12 +1588,12 @@ function MattersPage({ navigate, openModal }) {
             </button>
           </div>
           <div className="matter-board life-board">
-            {orderedMatters.map((m) => {
+            {visibleMatters.map((m) => {
               const index = matters.findIndex((item) => item.title === m.title && item.realm === m.realm);
               const r = realms.find((x) => x.name === m.realm),
                 Icon = m.Icon;
               return (
-                <article draggable onDragStart={(e) => { setDraggedMatter(orderedMatters.indexOf(m)); e.dataTransfer.effectAllowed = "move"; }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); reorderMatter(orderedMatters.indexOf(m)); }} onDragEnd={() => setDraggedMatter(null)}
+                <article draggable onDragStart={(e) => { setDraggedMatter(matterId(m)); e.dataTransfer.effectAllowed = "move"; }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); reorderMatter(m); }} onDragEnd={() => setDraggedMatter(null)}
                   style={{ "--c": r.color, "--t": r.tint }}
                   key={m.title}
                   onClick={() => openModal(`content-${index}`)}
@@ -1464,59 +1622,42 @@ function MattersPage({ navigate, openModal }) {
                 </article>
               );
             })}
+            {visibleMatters.length === 0 && (
+              <div className="matter-filter-empty">这个版图暂时没有正在展开的事项</div>
+            )}
           </div>
         </main>
         <aside className="life-aside">
           <section>
             <header>
-              <h3>日常照顾</h3>
-              <button onClick={() => openModal("addRoutine")}>
-                <Plus />
-              </button>
+              <div><h3>日常事项</h3><p>汇总已有的日常习惯</p></div>
             </header>
-            <button className="care-item">
-              <span>
-                <Heart />
-              </span>
-              <div>
-                <b>喝水与舒展</b>
-                <small>今天身体感觉如何？</small>
-              </div>
-            </button>
-            <button className="care-item">
-              <span>
-                <Clock3 />
-              </span>
-              <div>
-                <b>睡前离开屏幕</b>
-                <small>给睡眠一点准备时间</small>
-              </div>
-            </button>
-            <button className="care-item">
-              <span>
-                <BookOpen />
-              </span>
-              <div>
-                <b>记录今天</b>
-                <small>一句话也足够</small>
-              </div>
-            </button>
+            {routineMatters.length ? routineMatters.map((matter) => {
+              const Icon = matter.Icon,
+                index = matters.indexOf(matter),
+                pending = tasks.filter((task) => task.tag === matter.title && !task.done && !task.archived).length,
+                realm = realms.find((item) => item.name === matter.realm);
+              return (
+                <button className="aside-data-row" style={{ "--c": realm?.color, "--t": realm?.tint }} onClick={() => openModal(`content-${index}`)} key={`${matter.realm}-${matter.title}`}>
+                  <span><Icon /></span>
+                  <div><b>{matter.title}</b><small>{matter.realm} · {pending} 个待办</small></div>
+                  <ChevronRight />
+                </button>
+              );
+            }) : <p className="aside-data-empty">暂无日常习惯事项</p>}
           </section>
           <section>
             <header>
-              <h3>最近留下</h3>
-              <button onClick={() => openModal("note")}>
-                <Plus />
-              </button>
+              <div><h3>最近记录</h3><p>来自已有的灵感与生活记录</p></div>
+              <button onClick={() => openModal("note")} aria-label="记录灵感"><Plus /></button>
             </header>
-            <article className="life-note">
-              <time>8月8日</time>
-              <p>有些事情没有明显进展，但我和它的关系正在慢慢改变。</p>
-            </article>
-            <article className="life-note">
-              <time>8月5日</time>
-              <p>最近想把游泳重新放回生活里。</p>
-            </article>
+            {recentMemos.length ? recentMemos.map((memo) => (
+              <button className="record-summary-row" onClick={() => openModal("note")} key={memo.id}>
+                <span><Lightbulb /></span>
+                <div><b>{memo.text}</b><small>{memo.time}{memo.done ? " · 已整理" : ""}</small></div>
+                <ChevronRight />
+              </button>
+            )) : <p className="aside-data-empty">还没有留下记录</p>}
           </section>
         </aside>
       </div>
@@ -1524,7 +1665,10 @@ function MattersPage({ navigate, openModal }) {
   );
 }
 function TodoPage({ navigate, openModal, tasks, setTasks }) {
-  const visibleTasks = tasks.filter((t) => !t.archived),
+  const todayKey = new Date().toLocaleDateString("en-CA"),
+    visibleTasks = tasks.filter(
+      (t) => !t.archived && Boolean(t.date) && taskOccursOnDate(t, todayKey),
+    ),
     arrangedTasks = visibleTasks.filter(
       (t) => !t.done && /\d{1,2}:\d{2}/.test(`${t.meta || ""} ${t.time || ""}`),
     );
@@ -1567,8 +1711,8 @@ function TodoPage({ navigate, openModal, tasks, setTasks }) {
           ))}
         </aside>
         <Section
-          title="今天"
-          sub="2026年8月10日"
+          title="今日概览"
+          sub={todayKey}
           action={
             <button className="sort">
               按时间排序 <ChevronDown />
@@ -1601,6 +1745,7 @@ function TodoPage({ navigate, openModal, tasks, setTasks }) {
   );
 }
 function ProfilePage({ navigate, openModal }) {
+  const { profile } = useLivaProfile();
   const rows = [
       {
         title: "生活记录",
@@ -1677,10 +1822,10 @@ function ProfilePage({ navigate, openModal }) {
           </div>
         </header>
         <section className="profile-card">
-          <span className="profile-avatar">M</span>
+          <span className="profile-avatar">{profile.initials}</span>
           <div>
-            <h2>May</h2>
-            <p>登录后同步多端数据</p>
+            <h2>{profile.name}</h2>
+            <p>{profile.bio}</p>
           </div>
           <button onClick={() => openModal("profile")}>编辑资料</button>
         </section>
@@ -1692,21 +1837,13 @@ function ProfilePage({ navigate, openModal }) {
           <h3>应用设置</h3>
           <List items={settings} />
         </section>
-        <aside className="profile-quote">
-          <Leaf />
-          <div>
-            <b>把生活整理成自己喜欢的样子。</b>
-            <p>保持好奇，也允许每一种节奏自然发生。</p>
-          </div>
-          <i />
-          <i />
-        </aside>
       </div>
     </div>
   );
 }
-function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
-  const [view, setView] = useState("home"),
+function ProfilePanel({ close, openModal, tasks = [], setTasks, onDataChange, user, onSignOut, initialView = "home" }) {
+  const { profile } = useLivaProfile();
+  const [view, setView] = useState(initialView),
     [density, setDensity] = useState(savedAppearance.density),
     [theme, setTheme] = useState(savedAppearance.theme),
     [notifications, setNotifications] = useState({
@@ -1715,6 +1852,7 @@ function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
       sync: savedAppearance.followSystem,
     }),
     [feedback, setFeedback] = useState(""),
+    [recordRealm, setRecordRealm] = useState("全部"),
     groups = [
       {
         title: "个人空间",
@@ -1749,7 +1887,15 @@ function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
     },
     activeTasks = tasks.filter((t) => !t.done && !t.archived).length,
     doneTasks = tasks.filter((t) => t.done && !t.archived).length,
-    archivedTasks = tasks.filter((t) => t.archived);
+    archivedTasks = tasks.filter((t) => t.archived),
+    archivedMatters = matters.filter((m) => m.archived),
+    visibleRecordMatters = matters.filter((matter) => !matter.archived && (recordRealm === "全部" || matter.realm === recordRealm));
+  const restoreMatter = (matter) => {
+    matter.archived = false;
+    setTasks?.((current) => current.map((task) => task.tag === matter.title ? { ...task, archived: false } : task));
+    onDataChange?.();
+    setView("archive");
+  };
   const toggle = (id) => setNotifications((v) => ({ ...v, [id]: !v[id] })),
     BackHeader = () => (
       <header className="profile-subhead">
@@ -1777,18 +1923,21 @@ function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
         </header>
         <div className="profile-panel-scroll">
           <section className="profile-panel-card">
-            <span>M</span>
+            <span>{profile.initials}</span>
             <div>
-              <b>May</b>
+              <b>{profile.name}</b>
             <small>{user ? user.email : "登录后可在不同设备同步生活数据"}</small>
             </div>
-            <button
-              className="profile-login-button"
-              onClick={() => !user && openModal("login")}
-              disabled={Boolean(user)}
-            >
-              {user ? "已登录" : <><LogIn /> 登录并同步</>}
-            </button>
+            <div className="profile-panel-actions">
+              <button onClick={() => openModal("profile")}>编辑资料</button>
+              <button
+                className="profile-login-button"
+                onClick={() => !user && openModal("login")}
+                disabled={Boolean(user)}
+              >
+                {user ? "已登录" : <><LogIn /> 登录并同步</>}
+              </button>
+            </div>
           </section>
           {groups.map((group) => (
             <section className="profile-panel-group" key={group.title}>
@@ -1814,20 +1963,22 @@ function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
     ),
     Records = () => (
       <div className="profile-panel-scroll profile-subpage">
-        <div className="space-summary">
-          <article>
-            <b>{activeTasks}</b>
-            <span>正在推进</span>
-          </article>
-          <article>
-            <b>{doneTasks}</b>
-            <span>最近完成</span>
-          </article>
-          <article>
-            <b>{realms.length}</b>
-            <span>生活版图</span>
-          </article>
-        </div>
+        <section className="recent-matter-filter">
+          <header><div><h3>最近事项</h3><p>按版图筛选近期关注的事项</p></div></header>
+          <div className="record-realm-filters">
+            <button className={recordRealm === "全部" ? "active" : ""} onClick={() => setRecordRealm("全部")}>全部</button>
+            {realms.map((realm) => <button className={recordRealm === realm.name ? "active" : ""} style={{ "--c": realm.color, "--t": realm.tint }} onClick={() => setRecordRealm(realm.name)} key={realm.name}>{realm.name}</button>)}
+          </div>
+          <div className="recent-matter-list">
+            {visibleRecordMatters.map((matter) => {
+              const Icon = matter.Icon,
+                index = matters.indexOf(matter),
+                realm = realms.find((item) => item.name === matter.realm);
+              return <button style={{ "--c": realm?.color, "--t": realm?.tint }} onClick={() => openModal(`content-${index}`)} key={`${matter.realm}-${matter.title}`}><span><Icon /></span><div><b>{matter.title}</b><small>{matter.realm} · {matter.state}</small></div><ChevronRight /></button>;
+            })}
+            {!visibleRecordMatters.length && <p className="space-empty">这个版图暂无事项</p>}
+          </div>
+        </section>
         <section className="space-section">
           <header>
             <div>
@@ -1910,8 +2061,7 @@ function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
           <Archive />
           <div>
             <b>
-              {archivedTasks.length +
-                matters.filter((m) => m.state === "结束").length}{" "}
+              {archivedTasks.length + archivedMatters.length}{" "}
               项归档内容
             </b>
             <small>归档只是暂时收起，随时可以恢复</small>
@@ -1925,9 +2075,8 @@ function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
             </div>
           </header>
           <div className="archive-list">
-            {matters.filter((m) => m.state === "结束").length ? (
-              matters
-                .filter((m) => m.state === "结束")
+            {archivedMatters.length ? (
+              archivedMatters
                 .map((m) => (
                   <article key={m.title}>
                     <span>
@@ -1937,7 +2086,7 @@ function ProfilePanel({ close, openModal, tasks = [], user, onSignOut }) {
                       <b>{m.title}</b>
                       <small>{m.realm} · 已结束</small>
                     </div>
-                    <button>恢复</button>
+                    <button onClick={() => restoreMatter(m)}>恢复</button>
                   </article>
                 ))
             ) : (
@@ -2302,6 +2451,10 @@ function InlineTodoEditor({ task, setTasks, onClose }) {
       task.clock || /\d{1,2}:\d{2}/.exec(task.time || "")?.[0] || "",
     ),
     [repeat, setRepeat] = useState(task.repeat || ""),
+    [repeatInterval, setRepeatInterval] = useState(task.repeatInterval || 2),
+    [repeatUnit, setRepeatUnit] = useState(task.repeatUnit || "day"),
+    [repeatMode, setRepeatMode] = useState(task.repeatMode || "interval"),
+    [repeatWeekdays, setRepeatWeekdays] = useState(task.repeatWeekdays || []),
     [detailsOpen, setDetailsOpen] = useState(false),
     [note, setNote] = useState(task.note || "");
   const save = () => {
@@ -2317,6 +2470,10 @@ function InlineTodoEditor({ task, setTasks, onClose }) {
               time: time ? `${date} ${time}` : date,
               note,
               repeat,
+              repeatInterval,
+              repeatUnit,
+              repeatMode,
+              repeatWeekdays,
             }
           : item,
       ),
@@ -2355,17 +2512,19 @@ function InlineTodoEditor({ task, setTasks, onClose }) {
         </label>
         <label>
           <span>重复</span>
-          <select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+          <select value={repeat} onChange={(e) => repeatChange(e, setRepeat, setRepeatInterval)}>
             <option value="">不重复</option>
             <option value="daily">每天</option>
             <option value="weekdays">每个工作日</option>
             <option value="weekends">每个周末</option>
             <option value="weekly">每周</option>
-            <option value="biweekly">每两周</option>
             <option value="monthly">每月</option>
-            <option value="quarterly">每季度</option>
             <option value="yearly">每年</option>
+            <option value="custom">自定义</option>
           </select>
+          {repeat === "custom" && (
+            <CustomRepeatFields interval={repeatInterval} setInterval={setRepeatInterval} unit={repeatUnit} setUnit={setRepeatUnit} weekdays={repeatWeekdays} setWeekdays={setRepeatWeekdays} mode={repeatMode} setMode={setRepeatMode} />
+          )}
         </label>
       </div>
       <button
@@ -2402,7 +2561,7 @@ function InlineTodoEditor({ task, setTasks, onClose }) {
 }
 
 function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
-  const [showEnded, setShowEnded] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const Icon = realm.Icon,
     icons = [Video, Footprints, BookOpen, Sparkles],
     statusOptions = ["储备", "点亮", "结束"],
@@ -2468,17 +2627,19 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
               entry.title === directions[i] && entry.realm === realm.name,
           );
         if (item) item.state = next;
-        setTasks((tasks) =>
-          tasks.map((task) =>
-            task.tag === directions[i]
-              ? { ...task, archived: next === "结束" }
-              : task,
-          ),
-        );
+        setTasks((current) => current.map((task) => task.tag === directions[i] ? { ...task, archived: false } : task));
         onDataChange?.();
         return next;
       }),
     );
+  const archiveDirection = (i) => {
+    const item = matters.find((entry) => entry.title === directions[i] && entry.realm === realm.name);
+    if (!item) return;
+    item.archived = true;
+    setTasks((current) => current.map((task) => task.tag === directions[i] ? { ...task, archived: true } : task));
+    onDataChange?.();
+    setStatuses((current) => [...current]);
+  };
   const openDirection = (i) => {
     const itemIndex = matters.findIndex(
       (item) => item.title === directions[i] && item.realm === realm.name,
@@ -2569,12 +2730,34 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
     <div className="modal-backdrop realm-backdrop" onClick={close}>
       <section
         className="realm-modal simple-realm-modal refined-realm-modal"
+        data-realm={realm.name}
         style={{ "--c": realm.color, "--t": realm.tint }}
         onClick={(e) => e.stopPropagation()}
       >
         <button className="modal-close" onClick={close}>
           <X />
         </button>
+        <div className="realm-mobile-menu">
+          <button
+            className="realm-mobile-menu-trigger"
+            onClick={() => setMobileMenuOpen((value) => !value)}
+            aria-label="版图更多操作"
+            aria-expanded={mobileMenuOpen}
+          >
+            <MoreHorizontal />
+          </button>
+          {mobileMenuOpen && (
+            <button
+              className="realm-mobile-delete"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                window.__boardOpenModal?.(`deleteRealm-${realms.indexOf(realm)}`);
+              }}
+            >
+              <Trash2 /> 删除版图
+            </button>
+          )}
+        </div>
         <button
           className="secondary-delete"
           onClick={() =>
@@ -2605,15 +2788,15 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
           </div>
           <div className="header-summary">
             <article>
-              <b>{statuses.filter((s) => s === "点亮").length}</b>
+              <b>{statuses.filter((s, i) => s === "点亮" && !matters.find((m) => m.title === directions[i] && m.realm === realm.name)?.archived).length}</b>
               <span>点亮</span>
             </article>
             <article>
-              <b>{statuses.filter((s) => s === "储备").length}</b>
+              <b>{statuses.filter((s, i) => s === "储备" && !matters.find((m) => m.title === directions[i] && m.realm === realm.name)?.archived).length}</b>
               <span>储备</span>
             </article>
             <article>
-              <b>{statuses.filter((s) => s === "结束").length}</b>
+              <b>{statuses.filter((s, i) => s === "结束" && !matters.find((m) => m.title === directions[i] && m.realm === realm.name)?.archived).length}</b>
               <span>结束</span>
             </article>
           </div>
@@ -2647,13 +2830,15 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
               <button onClick={() => setAdding(false)}>取消</button>
             </div>
           )}
-          <div className="modal-directions direction-profile-grid">
+          <div className="modal-directions direction-profile-grid show-ended">
             {directions.map((d, i) => {
+              const linkedMatter = matters.find((item) => item.title === d && item.realm === realm.name);
+              if (linkedMatter?.archived) return null;
               const DIcon = iconForMatterName(d),
                 StatusIcon = statusIcons[statusOptions.indexOf(statuses[i])];
               return (
                 <article
-                  className={selectedIndex === i ? "is-expanded" : ""}
+                  className={`${selectedIndex === i ? "is-expanded" : ""} ${statuses[i] === "结束" ? "is-ended" : ""}`}
                   draggable={editingTitle?.index !== i}
                   onDragStart={(e) => {
                     setDraggedIndex(i);
@@ -2724,11 +2909,16 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
                       最近更新 · {["今天", "2天前", "5天前", "1周前"][i % 4]}
                     </small>
                   </footer>
+                  {statuses[i] === "结束" && (
+                    <button className="direction-archive-action" onClick={(e) => { e.stopPropagation(); archiveDirection(i); }} aria-label={`归档${d}`}>
+                      <Archive /> 归档
+                    </button>
+                  )}
                 </article>
               );
             })}
           </div>
-          {statuses.includes("结束") && (
+          {false && statuses.includes("结束") && (
             <button
               className="ended-items-toggle"
               onClick={() => setShowEnded((v) => !v)}
@@ -2747,7 +2937,7 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
               <ChevronDown className={showEnded ? "is-open" : ""} />
             </button>
           )}
-          {showEnded && (
+          {false && showEnded && (
             <section className="ended-items-panel">
               <div className="ended-grid direction-profile-grid">
                 {directions.map((d, i) => {
@@ -2999,7 +3189,7 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
 function QuickTodoModal({ close, setTasks, initialTag = "" }) {
   const defaultTodoTheme = realms[3] || { color: "#91aace", tint: "#fafbfd" };
   const [title, setTitle] = useState(""),
-    [tag, setTag] = useState(initialTag),
+    [tag, setTag] = useState(initialTag || "临时代办事项"),
     [selectedRealmName, setSelectedRealmName] = useState(() =>
       initialTag
         ? realms.find((r) => r.directions.includes(initialTag))?.name || ""
@@ -3008,6 +3198,10 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
     [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA")),
     [time, setTime] = useState(""),
     [repeat, setRepeat] = useState(""),
+    [repeatInterval, setRepeatInterval] = useState(2),
+    [repeatUnit, setRepeatUnit] = useState("day"),
+    [repeatMode, setRepeatMode] = useState("interval"),
+    [repeatWeekdays, setRepeatWeekdays] = useState([]),
     [note, setNote] = useState(""),
     [subtasks, setSubtasks] = useState([]),
     [subtaskDraft, setSubtaskDraft] = useState(""),
@@ -3031,12 +3225,17 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
         {
           id: Date.now(),
           title: title.trim(),
-          tag: tag || "收集箱",
+          tag: tag || (selectedRealmName === "Admin" ? "临时代办事项" : "收集箱"),
+          realm: selectedRealmName || undefined,
           time: taskTime,
           level: "normal",
           date,
           clock: time,
           repeat,
+          repeatInterval,
+          repeatUnit,
+          repeatMode,
+          repeatWeekdays,
           duration: "未设置",
           durationHours: 1,
           note,
@@ -3050,6 +3249,7 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
     <div className="modal-backdrop quick-todo-backdrop" onClick={close}>
       <section
         className="quick-todo-modal refined-quick-todo"
+        data-realm={realm.name}
         style={{ "--c": realm.color, "--t": realm.tint }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -3123,7 +3323,7 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
                 <option value="">不关联版图</option>
                 {realms.map((r) => (
                   <option value={r.name} key={r.name}>
-                    {r.name} · {r.note}
+                    {r.name} · {getRealmNote(r)}
                   </option>
                 ))}
               </select>
@@ -3171,17 +3371,19 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
             </label>
             <label>
               <span>重复</span>
-              <select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+              <select value={repeat} onChange={(e) => repeatChange(e, setRepeat, setRepeatInterval)}>
                 <option value="">不重复</option>
                 <option value="daily">每天</option>
                 <option value="weekdays">每个工作日</option>
                 <option value="weekends">每个周末</option>
                 <option value="weekly">每周</option>
-                <option value="biweekly">每两周</option>
                 <option value="monthly">每月</option>
-                <option value="quarterly">每季度</option>
                 <option value="yearly">每年</option>
+                <option value="custom">自定义</option>
               </select>
+              {repeat === "custom" && (
+                <CustomRepeatFields interval={repeatInterval} setInterval={setRepeatInterval} unit={repeatUnit} setUnit={setRepeatUnit} weekdays={repeatWeekdays} setWeekdays={setRepeatWeekdays} mode={repeatMode} setMode={setRepeatMode} />
+              )}
             </label>
           </div>
         </section>
@@ -3549,7 +3751,7 @@ function QuickSidebar({
             >
               <i style={{ background: realm.color }} />
               <span>{realm.name}</span>
-              <b>{matters.filter((matter) => matter.realm === realm.name).length}</b>
+              <b>{matters.filter((matter) => matter.realm === realm.name && !matter.archived).length}</b>
             </button>
           ))}
         </section>
@@ -3635,10 +3837,86 @@ function MobileNav({ page, navigate, openModal }) {
   );
 }
 
-function serializeCloudState(tasks) {
+function MobileQuickCapture({ page, openModal }) {
+  const [open, setOpen] = useState(false),
+    visible = ["today", "todo", "timeline"].includes(page),
+    choose = (modal) => {
+      setOpen(false);
+      openModal(modal);
+    };
+  useEffect(() => setOpen(false), [page]);
+  if (!visible) return null;
+  return (
+    <div className={`mobile-quick-capture ${open ? "is-open" : ""}`}>
+      {open && (
+        <button
+          className="mobile-quick-scrim"
+          onClick={() => setOpen(false)}
+          aria-label="关闭快捷操作"
+        />
+      )}
+      {open && (
+        <div className="mobile-quick-menu" role="menu">
+          <button onClick={() => choose("addTodo")} role="menuitem">
+            <span className="todo-tone"><ListChecks /></span>
+            <div><b>新建待办</b><small>记录一件需要完成的事</small></div>
+          </button>
+          <button onClick={() => choose("note")} role="menuitem">
+            <span className="idea-tone"><Lightbulb /></span>
+            <div><b>记录灵感</b><small>留住突然出现的想法</small></div>
+          </button>
+        </div>
+      )}
+      <button
+        className="mobile-quick-trigger"
+        onClick={() => setOpen((value) => !value)}
+        aria-label={open ? "关闭快捷操作" : "打开快捷操作"}
+        aria-expanded={open}
+      >
+        <Plus />
+      </button>
+    </div>
+  );
+}
+
+function ProfileEditModal({ close }) {
+  const { profile, saveProfile } = useLivaProfile();
+  const [draft, setDraft] = useState(profile);
+  const submit = (event) => {
+    event.preventDefault();
+    const name = draft.name.trim();
+    if (!name) return;
+    saveProfile({
+      name,
+      initials: (draft.initials.trim() || name.slice(0, 1)).slice(0, 2).toUpperCase(),
+      bio: draft.bio.trim() || defaultProfile.bio,
+    });
+    close();
+  };
+  return (
+    <div className="modal-backdrop profile-edit-backdrop" onClick={close}>
+      <section className="profile-edit-modal" onClick={(event) => event.stopPropagation()}>
+        <button className="modal-close" onClick={close} aria-label="关闭"><X /></button>
+        <header>
+          <span className="profile-edit-preview">{draft.initials || draft.name.slice(0, 1) || "M"}</span>
+          <div><h2>编辑资料</h2><p>这些信息会同步显示在电脑端和手机端。</p></div>
+        </header>
+        <form onSubmit={submit}>
+          <label><span>称呼</span><input autoFocus maxLength="20" value={draft.name} onChange={(e) => setDraft((value) => ({ ...value, name: e.target.value }))} placeholder="你的称呼" /></label>
+          <label><span>头像文字</span><input maxLength="2" value={draft.initials} onChange={(e) => setDraft((value) => ({ ...value, initials: e.target.value }))} placeholder="1–2 个字符" /></label>
+          <label className="profile-edit-bio"><span>个人说明</span><textarea maxLength="60" value={draft.bio} onChange={(e) => setDraft((value) => ({ ...value, bio: e.target.value }))} placeholder="写一句关于自己的话" /><small>{draft.bio.length}/60</small></label>
+          <footer><button type="button" onClick={close}>取消</button><button className="profile-edit-save" type="submit"><Check /> 保存资料</button></footer>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function serializeCloudState(tasks, profile = savedProfile) {
   return {
     version: 1,
     tasks,
+    profile,
     inspirationMemos,
     realms: realms.map(({ Icon, ...realm }) => realm),
     matters: matters.map(({ Icon, todos, ...matter }) => matter),
@@ -3656,6 +3934,7 @@ function restoreCloudState(snapshot) {
       realms.length,
       ...snapshot.realms.map((realm, index) => ({
         ...realm,
+        note: getRealmNote(realm),
         Icon:
           realmIcons.get(realm.name) ||
           [BriefcaseBusiness, Heart, Leaf, Settings2][index % 4],
@@ -3694,6 +3973,7 @@ function ModalLayer({
   user,
   onSignOut,
 }) {
+  if (modal === "profile") return <ProfileEditModal close={close} />;
   if (modal?.startsWith("todoEdit-")) {
     const task = tasks.find((t) => t.id === Number(modal.split("-")[1]));
     return <TodoEditModal task={task} setTasks={setTasks} close={close} />;
@@ -3740,8 +4020,23 @@ function ModalLayer({
         close={close}
         openModal={openModal}
         tasks={tasks}
+        setTasks={setTasks}
+        onDataChange={refresh}
         user={user}
         onSignOut={onSignOut}
+      />
+    );
+  if (modal === "archive")
+    return (
+      <ProfilePanel
+        close={close}
+        openModal={openModal}
+        tasks={tasks}
+        setTasks={setTasks}
+        onDataChange={refresh}
+        user={user}
+        onSignOut={onSignOut}
+        initialView="archive"
       />
     );
   if (modal === "login") return <LoginModal close={close} />;
@@ -3789,15 +4084,49 @@ const MemoProfilePage = React.memo(ProfilePage);
 const MemoMobileNav = React.memo(MobileNav);
 
 function App() {
-  const [page, setPage] = useState("today"),
+  const [page, setPage] = useState(() =>
+      window.matchMedia?.("(max-width: 800px)").matches ? "todo" : "today",
+    ),
     [modalStack, setModalStack] = useState([]),
     [closingLayers, setClosingLayers] = useState([]),
     [tasks, setTasks] = useState(initialTasks),
     [notificationReadIds, setNotificationReadIds] = useState([]),
     [sidebarCollapsed, setSidebarCollapsed] = useState(true),
     [realmVersion, setRealmVersion] = useState(0),
-    [user, setUser] = useState(null);
+    [user, setUser] = useState(null),
+    [profile, setProfile] = useState(savedProfile);
+  const saveProfile = React.useCallback((nextProfile) => {
+    setProfile(nextProfile);
+    localStorage.setItem("liva-profile", JSON.stringify(nextProfile));
+  }, []);
   const [cloudReady, setCloudReady] = useState(!isSupabaseConfigured);
+  useEffect(() => {
+    const scrollTimers = new Map();
+    const markScrolling = (event) => {
+      const target =
+        event.target === document
+          ? document.scrollingElement || document.documentElement
+          : event.target instanceof HTMLElement
+            ? event.target
+            : document.documentElement;
+      target.classList.add("is-scrolling");
+      const previousTimer = scrollTimers.get(target);
+      if (previousTimer) window.clearTimeout(previousTimer);
+      scrollTimers.set(
+        target,
+        window.setTimeout(() => {
+          target.classList.remove("is-scrolling");
+          scrollTimers.delete(target);
+        }, 700),
+      );
+    };
+
+    document.addEventListener("scroll", markScrolling, true);
+    return () => {
+      document.removeEventListener("scroll", markScrolling, true);
+      scrollTimers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, []);
   useEffect(() => {
     if (!supabase) return;
     let mounted = true;
@@ -3825,6 +4154,7 @@ function App() {
         if (snapshot) {
           restoreCloudState(snapshot);
           if (Array.isArray(snapshot.tasks)) setTasks(snapshot.tasks);
+          if (snapshot.profile) saveProfile({ ...defaultProfile, ...snapshot.profile });
           setRealmVersion((v) => v + 1);
         }
         setCloudReady(true);
@@ -3841,18 +4171,19 @@ function App() {
     if (!isSupabaseConfigured || !cloudReady) return;
     const timer = window.setTimeout(
       () =>
-        saveCloudSnapshot(serializeCloudState(tasks)).catch((error) =>
+        saveCloudSnapshot(serializeCloudState(tasks, profile)).catch((error) =>
           console.warn("Supabase save skipped:", error.message),
         ),
       700,
     );
     return () => window.clearTimeout(timer);
-  }, [tasks, realmVersion, cloudReady]);
+  }, [tasks, realmVersion, cloudReady, profile]);
   useEffect(() => {
     const reloadAfterAuth = () => {
       loadCloudSnapshot()
         .then((snapshot) => {
           if (snapshot?.tasks) setTasks(snapshot.tasks);
+          if (snapshot?.profile) saveProfile({ ...defaultProfile, ...snapshot.profile });
           if (snapshot) {
             restoreCloudState(snapshot);
             setRealmVersion((v) => v + 1);
@@ -3887,7 +4218,7 @@ function App() {
   if (page === "map")
     content = <MemoMapPage navigate={navigate} openModal={openModal} />;
   else if (page === "matters")
-    content = <MemoMattersPage navigate={navigate} openModal={openModal} />;
+    content = <MemoMattersPage navigate={navigate} openModal={openModal} tasks={tasks} />;
   else if (page === "todo")
     content = (
       <TodoPage
@@ -3928,6 +4259,7 @@ function App() {
     );
   const refresh = () => setRealmVersion((v) => v + 1);
   return (
+    <ProfileContext.Provider value={{ profile, saveProfile }}>
     <div
       className={`shell with-quick-sidebar ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
     >
@@ -3944,6 +4276,7 @@ function App() {
           {content}
         </div>
         <MemoMobileNav page={page} navigate={navigate} openModal={openModal} />
+        <MobileQuickCapture page={page} openModal={openModal} />
       </main>
       {modalStack.map((entry, index) => (
         <div
@@ -3971,6 +4304,7 @@ function App() {
         </div>
       ))}
     </div>
+    </ProfileContext.Provider>
   );
 }
 
@@ -4212,7 +4546,7 @@ function ContentDetailModal({
               </button>
             )}
             <p>
-              {item.realm} · {realm.note}
+              {item.realm} · {getRealmNote(realm)}
             </p>
           </div>
           <div className="content-numbers">
@@ -4528,6 +4862,10 @@ function TodoEditModal({ task, setTasks, close, compact = false }) {
       task.clock || /\d{1,2}:\d{2}/.exec(task.time || "")?.[0] || "",
     ),
     [repeat, setRepeat] = useState(task.repeat || ""),
+    [repeatInterval, setRepeatInterval] = useState(task.repeatInterval || 2),
+    [repeatUnit, setRepeatUnit] = useState(task.repeatUnit || "day"),
+    [repeatMode, setRepeatMode] = useState(task.repeatMode || "interval"),
+    [repeatWeekdays, setRepeatWeekdays] = useState(task.repeatWeekdays || []),
     [note, setNote] = useState(task.note || ""),
     [subtasks, setSubtasks] = useState(task.subtasks || []),
     [subtaskDraft, setSubtaskDraft] = useState(""),
@@ -4557,6 +4895,10 @@ function TodoEditModal({ task, setTasks, close, compact = false }) {
                 time: time ? `${date} ${time}` : date,
                 note,
                 repeat,
+                repeatInterval,
+                repeatUnit,
+                repeatMode,
+                repeatWeekdays,
                 subtasks: subtasks.filter(Boolean),
               }
             : t,
@@ -4620,7 +4962,7 @@ function TodoEditModal({ task, setTasks, close, compact = false }) {
                 <option value="">不关联版图</option>
                 {realms.map((r) => (
                   <option value={r.name} key={r.name}>
-                    {r.name} · {r.note}
+                    {r.name} · {getRealmNote(r)}
                   </option>
                 ))}
               </select>
@@ -4668,17 +5010,19 @@ function TodoEditModal({ task, setTasks, close, compact = false }) {
         </label>
         <label>
           <span>重复</span>
-          <select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+          <select value={repeat} onChange={(e) => repeatChange(e, setRepeat, setRepeatInterval)}>
             <option value="">不重复</option>
             <option value="daily">每天</option>
             <option value="weekdays">每个工作日</option>
             <option value="weekends">每个周末</option>
             <option value="weekly">每周</option>
-            <option value="biweekly">每两周</option>
             <option value="monthly">每月</option>
-            <option value="quarterly">每季度</option>
             <option value="yearly">每年</option>
+            <option value="custom">自定义</option>
           </select>
+          {repeat === "custom" && (
+            <CustomRepeatFields interval={repeatInterval} setInterval={setRepeatInterval} unit={repeatUnit} setUnit={setRepeatUnit} weekdays={repeatWeekdays} setWeekdays={setRepeatWeekdays} mode={repeatMode} setMode={setRepeatMode} />
+          )}
         </label>
           </div>
         </section>
@@ -5165,7 +5509,7 @@ function AddDirectionModal({ close, onCreated, initialRealmName = "" }) {
                     <Icon />
                   </span>
                   <b>{r.name}</b>
-                  <small>{r.note}</small>
+                  <small>{getRealmNote(r)}</small>
                 </button>
               );
             })}
