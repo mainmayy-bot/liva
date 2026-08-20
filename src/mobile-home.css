@@ -3,7 +3,79 @@
   display: none;
 }
 
+/* Only the scheduled "正在推进" group becomes a compact time-point axis. */
+@media(max-width:800px){
+  .schedule-todos .timed-task-timeline{position:relative;display:grid;gap:10px}
+  .schedule-todos .timed-task-timeline::before{position:absolute;top:17px;bottom:17px;left:51px;width:1px;background:#dfe5e2;content:""}
+  .schedule-todos .timed-task-row{position:relative;display:grid;grid-template-columns:40px 14px minmax(0,1fr);align-items:center;column-gap:4px}
+  .schedule-todos .timed-task-row>time{color:#69746f;font-size:10px;font-weight:550;font-variant-numeric:tabular-nums;text-align:left}
+  .schedule-todos .timed-task-node{position:relative;z-index:2;display:block;width:8px;height:8px;justify-self:center;border:2px solid #fff;border-radius:50%;background:var(--task-color);box-shadow:0 0 0 1px color-mix(in srgb,var(--task-color) 28%,#dfe5e2)}
+  .schedule-todos .timed-task-row>article{grid-column:3;width:100%;min-width:0;margin:0}
+
+  .todo-page-shell .tasks article.is-completing{pointer-events:none;transform-origin:center;animation:mobile-todo-complete .36s cubic-bezier(.22,.8,.25,1) forwards}
+  .todo-page-shell .tasks article.is-completing .task-check{position:relative;border-color:var(--task-color)!important;background:var(--task-color)!important;color:#fff!important;animation:mobile-check-pop .24s cubic-bezier(.2,1.35,.4,1)}
+  .todo-page-shell .task-check svg{position:absolute;top:50%;left:50%;display:block;width:11px;height:11px;margin:0;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transform:translate(-50%,-50%)}
+  .todo-page-shell .tasks article.is-completing .task-copy b{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--task-color) 72%,#606b65);text-decoration-thickness:1px}
+  .todo-page-shell .tasks article.is-completing .task-copy{opacity:.5}
+}
+
+@keyframes mobile-check-pop{0%{transform:scale(.78)}65%{transform:scale(1.1)}100%{transform:scale(1)}}
+@keyframes mobile-todo-complete{0%,45%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-5px) scale(.975)}}
+
+@media(max-width:800px) and (prefers-reduced-motion:reduce){.todo-page-shell .tasks article.is-completing,.todo-page-shell .tasks article.is-completing .task-check{animation:none}}
+
+/* Mobile todo format: week strip, section pills and a readable vertical time flow. */
+@media(max-width:800px){
+  .mobile-todo-timeline-list{display:grid;gap:10px}
+  .mobile-week-picker{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 38px;align-items:center;gap:8px;border:1px solid #e3e9e6;border-radius:18px;background:rgba(255,255,255,.9);padding:9px;box-shadow:0 7px 22px rgba(50,66,57,.035)}
+  .mobile-week-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .mobile-week-days button{display:grid;min-width:0;height:48px;place-items:center;border:0;border-radius:14px;background:#f5f7f6;padding:6px 0;color:#6f7a75}
+  .mobile-week-days button span{font-size:8px;font-weight:600}
+  .mobile-week-days button b{font-size:12px;font-weight:650}
+  .mobile-week-days button.active{background:#e8f2ec;color:#56836a;box-shadow:inset 0 0 0 1px #d5e6dc}
+  .mobile-calendar-trigger{display:grid;width:38px;height:38px;place-items:center;border:1px solid #e2e8e5;border-radius:13px;background:#fff;color:#718079;box-shadow:0 5px 14px rgba(54,71,62,.06)}
+  .mobile-calendar-trigger svg{width:16px}
+  .mobile-calendar-input{position:absolute;z-index:2;top:9px;right:9px;width:38px;height:38px;border:0;opacity:0;cursor:pointer;color-scheme:light}
+
+  .mobile-todo-timeline-list>.schedule-todos{height:auto!important;min-height:0!important;margin:0;padding:18px 14px 20px}
+  .mobile-todo-timeline-list>.schedule-todos>.section-head{display:flex!important;margin-bottom:13px}
+  .mobile-todo-timeline-list>.schedule-todos>.section-head p{display:block!important;margin-top:4px;color:#919a95;font-size:8px}
+  .mobile-todo-timeline-list>.schedule-todos .grouped-task-scroll{height:auto!important;max-height:none!important;overflow:visible}
+  .mobile-todo-timeline-list>.schedule-todos .todo-sub{margin:17px 0 12px}
+  .mobile-todo-timeline-list>.schedule-todos .todo-sub>span,
+  .mobile-todo-timeline-list>.schedule-todos .anytime-heading>span{display:inline-flex;width:max-content;align-items:center;gap:6px;border-radius:999px;background:#edf4f0;padding:7px 11px;color:#536b5e;font-size:10px;font-weight:650}
+  .mobile-todo-timeline-list>.schedule-todos .todo-sub>span svg,
+  .mobile-todo-timeline-list>.schedule-todos .anytime-heading>span svg{width:13px;height:13px;color:#789b84}
+  .mobile-todo-timeline-list>.schedule-todos .todo-sort-trigger{height:30px;border:1px solid #e3e8e5;background:#fff}
+
+  .mobile-todo-timeline-list .timed-task-timeline{gap:13px;padding-bottom:2px}
+  .mobile-todo-timeline-list .schedule-todos .timed-task-timeline::before{top:23px;bottom:18px;left:7px;background:#e2e8e5}
+  .mobile-todo-timeline-list .schedule-todos .timed-task-row{display:grid;grid-template-columns:18px minmax(0,1fr);align-items:start;gap:7px 8px}
+  .mobile-todo-timeline-list .schedule-todos .timed-task-row>time{grid-column:1/-1;padding-left:19px;color:#7b8580;font-size:11px;font-weight:650;line-height:16px}
+  .mobile-todo-timeline-list .schedule-todos .timed-task-node{position:absolute;top:4px;left:3px;width:8px;height:8px}
+  .mobile-todo-timeline-list .schedule-todos .timed-task-row>article{grid-column:2;margin:0}
+  .mobile-todo-timeline-list .schedule-todos .anytime-heading{margin:22px 0 12px;border-top:1px dashed #e3e8e5;padding-top:18px}
+}
+
+/* iOS home-screen mode: keep portal-mounted controls on the visual viewport. */
+@media(max-width:800px){
+  html,body,#root{min-height:100%;min-height:100dvh}
+  body{overflow-x:hidden}
+  .mobile-nav{position:fixed!important;right:12px!important;bottom:max(8px,env(safe-area-inset-bottom))!important;left:12px!important;height:64px!important;padding:0 8px!important;isolation:isolate}
+  .mobile-quick-trigger{bottom:calc(82px + max(8px,env(safe-area-inset-bottom)))!important}
+  .mobile-quick-menu{bottom:calc(140px + max(8px,env(safe-area-inset-bottom)))!important}
+}
+
+@media(max-width:800px) and (display-mode:standalone){
+  body{min-height:100dvh}
+  .with-quick-sidebar>.app,.sidebar-collapsed>.app,.no-sidebar>.app,.shell>.app{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
+}
+
 .time-compass {
+  display: none;
+}
+
+.mobile-timeline-task-panel {
   display: none;
 }
 
@@ -16,6 +88,37 @@
 }
 
 @media (max-width: 800px) {
+  .timeline-page-shell .planning-board.timeline-only > .timeline-panel.full-axis {
+    display: none !important;
+  }
+
+  .timeline-page-shell .mobile-timeline-task-panel {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .timeline-page-shell .mobile-timeline-task-panel > .schedule-todos {
+    display: flex;
+    width: 100%;
+    height: 100% !important;
+    min-height: 0 !important;
+    flex-direction: column;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  .timeline-page-shell .mobile-timeline-task-panel .grouped-task-scroll {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+
   .mobile-page-transition {
     animation: mobile-page-enter 220ms cubic-bezier(.22, .75, .32, 1) both;
   }
@@ -1040,5 +1143,109 @@
   .mobile-nav button,
   .schedule-todos .tasks article {
     transition: none;
+  }
+}
+
+/* Compact mobile todo cards while keeping their information and hit targets. */
+@media(max-width:800px){
+  .todo-page-shell .tasks article,
+  .todo-page-shell .schedule-todos .tasks article{
+    min-height:58px!important;
+    padding:6px 8px 6px 6px!important;
+    border-radius:13px;
+  }
+  .todo-page-shell .task-copy b{font-size:11px;line-height:1.4}
+  .todo-page-shell .task-copy small{display:block;width:100%;margin:3px 0 0;padding:0;font-size:9px;line-height:1.35;text-align:left}
+  .todo-page-shell .task-remove{height:30px}
+  .todo-page-shell .tasks article .task-copy{
+    display:flex!important;
+    min-height:100%;
+    align-self:stretch;
+    justify-content:center;
+    flex-direction:column;
+  }
+  .todo-page-shell .task-title-line{
+    display:flex;
+    width:max-content;
+    max-width:100%;
+    min-width:0;
+    align-items:center;
+    justify-content:flex-start;
+    gap:3px;
+  }
+  .todo-page-shell .task-title-line b{
+    width:auto!important;
+    flex:0 1 auto!important;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .todo-page-shell .task-title-line em{
+    flex:none;
+    margin-left:0!important;
+    font-size:9px;
+    line-height:1.4;
+    white-space:nowrap;
+  }
+  .todo-page-shell .completed-task-window > summary{
+    font-size:9px;
+    font-weight:500;
+    line-height:1.4;
+  }
+  .todo-page-shell .completed-task-window article > button:last-child{
+    gap:0;
+    justify-content:center;
+    align-self:stretch;
+    align-items:flex-start;
+    width:100%;
+    min-width:0;
+    text-align:left;
+    justify-items:start;
+  }
+  .todo-page-shell .completed-task-window article b{
+    font-size:11px;
+    font-weight:600;
+    line-height:1.4;
+  }
+  .todo-page-shell .completed-task-window article small{
+    display:block;
+    margin-top:3px;
+    font-size:9px;
+    line-height:1.35;
+  }
+}
+
+.mobile-reorder-handle{display:none}
+@media(max-width:800px){
+  .draggable-board-card,.draggable-matter-card{position:relative}
+  .mobile-reorder-handle{
+    position:absolute;top:7px;right:7px;z-index:6;display:grid;width:30px;height:30px;
+    place-items:center;border:0;border-radius:9px;background:rgba(255,255,255,.8);color:#9eaaa4;
+    touch-action:none;-webkit-user-select:none;user-select:none
+  }
+  .mobile-reorder-handle svg{width:14px;height:14px}
+  .todo-page-shell .tasks article>.drag{touch-action:none}
+  body.mobile-reordering{overflow:hidden;user-select:none}
+  body.mobile-reordering [data-touch-order]{transition:transform .16s ease,opacity .16s ease}
+  body.mobile-reordering [data-touch-order]:active{opacity:.72;transform:scale(.985)}
+}
+
+@media(max-width:800px){
+  body .todo-page-shell details.completed-task-window > div > article > button:nth-of-type(2){
+    display:grid!important;
+    width:100%!important;
+    align-content:center!important;
+    align-items:center!important;
+    justify-content:stretch!important;
+    justify-items:start!important;
+    text-align:left!important;
+  }
+  body .todo-page-shell details.completed-task-window > div > article > button:nth-of-type(2) b,
+  body .todo-page-shell details.completed-task-window > div > article > button:nth-of-type(2) small{
+    width:100%!important;
+    margin-right:0!important;
+    margin-left:0!important;
+    text-align:left!important;
   }
 }

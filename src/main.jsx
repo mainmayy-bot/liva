@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import { createContext, useContext } from "react";
 import {
   Archive,
@@ -32,6 +33,7 @@ import {
   LockKeyhole,
   LogIn,
   Mail,
+  Mic,
   MessageCircle,
   Mountain,
   Moon,
@@ -46,6 +48,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Send,
   Settings,
   Settings2,
   Sparkles,
@@ -62,6 +65,7 @@ import "./refinements.css";
 import "./mobile-home.css";
 import "./mobile-depth.css";
 import "./mobile-realm.css";
+import "./assistant.css";
 import {
   isSupabaseConfigured,
   loadCloudSnapshot,
@@ -69,6 +73,55 @@ import {
   supabase,
 } from "./lib/supabase";
 import { layoutTimelineItems } from "./lib/timeline-layout";
+
+function useTouchReorder(moveItem) {
+  const moveRef = useRef(moveItem), dragRef = useRef(null);
+  moveRef.current = moveItem;
+  const bind = (key) => ({
+    onTouchStart: (event) => {
+      event.stopPropagation();
+      const touch = event.touches[0];
+      dragRef.current = {
+        key: String(key),
+        x: touch.clientX,
+        y: touch.clientY,
+        timer: window.setTimeout(() => {
+          if (!dragRef.current) return;
+          dragRef.current.active = true;
+          document.body.classList.add("mobile-reordering");
+          navigator.vibrate?.(12);
+        }, 240),
+      };
+    },
+    onTouchMove: (event) => {
+      const drag = dragRef.current, touch = event.touches[0];
+      if (!drag) return;
+      if (!drag.active && Math.hypot(touch.clientX - drag.x, touch.clientY - drag.y) > 8) {
+        window.clearTimeout(drag.timer);
+        dragRef.current = null;
+        return;
+      }
+      if (!drag.active) return;
+      event.preventDefault();
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest?.("[data-touch-order]");
+      const targetKey = target?.dataset.touchOrder;
+      if (targetKey && targetKey !== drag.key) {
+        moveRef.current(drag.key, targetKey);
+        drag.key = targetKey;
+      }
+    },
+    onTouchEnd: () => {
+      window.clearTimeout(dragRef.current?.timer);
+      dragRef.current = null;
+      document.body.classList.remove("mobile-reordering");
+    },
+    onClick: (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    },
+  });
+  return bind;
+}
 
 function applyAppearance(theme, density, followSystem = false) {
   const prefersDark = window.matchMedia?.(
@@ -198,7 +251,7 @@ const realms = [
     tint: "#fafbfd",
     intro:
       "承接生活里必要但琐碎的部分。日程、家务、资料与关系维护，让生活运行得更轻松。",
-    directions: ["日程整理", "空间维护", "资料归档", "关系联络", "临时代办事项"],
+    directions: ["日程整理", "空间维护", "资料归档", "关系联络", "临时待办事项"],
   },
 ];
 const defaultRealmNotes = {
@@ -517,9 +570,25 @@ function MatterCard({ item, index, openModal, tasks }) {
   );
 }
 function TodoList({ tasks, setTasks, openModal, full = false }) {
-  const [deleting, setDeleting] = useState([]);
-  const toggle = (id) =>
-    setTasks((v) => v.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  const [deleting, setDeleting] = useState([]),
+    [completing, setCompleting] = useState([]);
+  const toggle = (id) => {
+    const task = tasks.find((item) => item.id === id);
+    if (!task || completing.includes(id)) return;
+    if (!window.matchMedia?.("(max-width: 800px)").matches) {
+      setTasks((value) => value.map((item) => item.id === id ? { ...item, done: !item.done } : item));
+      return;
+    }
+    if (task.done) {
+      setTasks((value) => value.map((item) => item.id === id ? { ...item, done: false, completedAt: null } : item));
+      return;
+    }
+    setCompleting((value) => [...value, id]);
+    window.setTimeout(() => {
+      setTasks((value) => value.map((item) => item.id === id ? { ...item, done: true, completedAt: new Date().toISOString() } : item));
+      setCompleting((value) => value.filter((item) => item !== id));
+    }, 360);
+  };
   const remove = (id) => {
     if (deleting.includes(id)) return;
     setDeleting((v) => [...v, id]);
@@ -543,7 +612,7 @@ function TodoList({ tasks, setTasks, openModal, full = false }) {
         {tasks.map((t) => {
           const realm = realmForTask(t);
           return <article
-            className={`${t.done ? "done" : ""} ${deleting.includes(t.id) ? "is-deleting" : ""}`}
+            className={`${t.done ? "done" : ""} ${completing.includes(t.id) ? "is-completing" : ""} ${deleting.includes(t.id) ? "is-deleting" : ""}`}
             data-realm={realm.name}
             style={{ "--task-color": realm.color, "--task-tint": realm.tint }}
             key={t.id}
@@ -553,6 +622,7 @@ function TodoList({ tasks, setTasks, openModal, full = false }) {
               className="task-check"
               onClick={() => toggle(t.id)}
               aria-label={`完成${t.title}`}
+              disabled={completing.includes(t.id)}
             >
               <Check />
             </button>
@@ -560,8 +630,10 @@ function TodoList({ tasks, setTasks, openModal, full = false }) {
               className="task-copy"
               onClick={() => openModal(`todoEdit-${t.id}`)}
             >
-              <b>{t.title}</b>
-              {t.level === "late" && <em>已逾期</em>}
+              <span className="task-title-line">
+                <b>{t.title}</b>
+                {t.level === "late" && <em>已逾期</em>}
+              </span>
               <small>
                 {t.tag} · {t.time}
               </small>
@@ -603,6 +675,10 @@ function ScheduleTodoPanel({
   selectedDateKey,
   navigate,
   openModal,
+  mobileTimeline = false,
+  sectionTitle = "今日待办",
+  sectionSub = "",
+  showAddAction = true,
 }) {
   const [sortMode, setSortMode] = useState("manual"),
     [completing, setCompleting] = useState([]),
@@ -613,15 +689,22 @@ function ScheduleTodoPanel({
       realm: "按版图",
       status: "按状态",
     },
+    todayKey = new Date().toLocaleDateString("en-CA"),
+    matchesSelectedDate = (task) => {
+      if (task.date) return taskOccursOnDate(task, selectedDateKey);
+      if (/(?:今天|今晚)/.test(`${task.meta || ""} ${task.time || ""}`))
+        return selectedDateKey === todayKey;
+      return true;
+    },
     active = tasks.filter(
       (t) =>
         !t.done &&
         !t.archived &&
         t.matterStatus !== "待安排" &&
-        taskOccursOnDate(t, selectedDateKey),
+        matchesSelectedDate(t),
     ),
     completed = tasks.filter(
-      (t) => t.done && !t.archived && taskOccursOnDate(t, selectedDateKey),
+      (t) => t.done && !t.archived && matchesSelectedDate(t),
     ),
     isTimed = (t) =>
       scheduled.some((s) => s.taskId === t.id) || /\d{1,2}:\d{2}/.test(t.time),
@@ -682,15 +765,27 @@ function ScheduleTodoPanel({
         setCompleting((v) => v.filter((item) => item !== id));
       }, 360);
     };
-  const Cards = ({ items }) => (
-    <div className="tasks">
+  const timelineClock = (task) => {
+    const arranged = scheduled.find((item) => item.taskId === task.id);
+    if (arranged) {
+      const minutes = Math.round(Number(arranged.start) * 60);
+      return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+    }
+    return task.clock || `${task.meta || ""} ${task.time || ""}`.match(/\d{1,2}:\d{2}/)?.[0] || "--:--";
+  };
+  const bindTaskTouch = useTouchReorder((source, target) => {
+    if (sortMode === "manual") reorderTask(Number(source), Number(target));
+  });
+  const Cards = ({ items, timeline = false }) => (
+    <div className={`tasks ${timeline ? "timed-task-timeline" : ""}`}>
       {items.map((t) => {
         const arranged = scheduled.some((s) => s.taskId === t.id),
           realm = realmForTask(t),
           isCompleting = completing.includes(t.id);
-        return (
+        const card = (
           <article
             className={`${arranged ? "arranged " : ""}${isCompleting ? "is-completing" : ""}${deleting.includes(t.id) ? " is-deleting" : ""}`}
+            data-touch-order={t.id}
             data-realm={realm.name}
             style={{
               "--task-color": realm?.color || "#8fa39a",
@@ -720,7 +815,7 @@ function ScheduleTodoPanel({
             }}
             key={t.id}
           >
-            <GripVertical className="drag" />
+            <GripVertical className="drag" {...bindTaskTouch(t.id)} />
             <button
               className="task-check"
               onClick={() => completeTask(t.id)}
@@ -733,8 +828,10 @@ function ScheduleTodoPanel({
               className="task-copy"
               onClick={() => navigate(`todoEdit-${t.id}`)}
             >
-              <b>{t.title}</b>
-              {t.level === "late" && <em>已逾期</em>}
+              <span className="task-title-line">
+                <b>{t.title}</b>
+                {t.level === "late" && <em>已逾期</em>}
+              </span>
               <small>
                 {t.tag} · {t.time}
               </small>
@@ -759,19 +856,31 @@ function ScheduleTodoPanel({
             </button>
           </article>
         );
+        return timeline ? (
+          <div
+            className="timed-task-row"
+            style={{ "--task-color": realm?.color || "#8fa39a" }}
+            key={`timeline-${t.id}`}
+          >
+            <time>{timelineClock(t)}</time>
+            <span className="timed-task-node" aria-hidden="true" />
+            {card}
+          </div>
+        ) : card;
       })}
     </div>
   );
   return (
     <Section
       id="today-todos"
-      title="今日待办"
+      title={sectionTitle}
+      sub={sectionSub}
       className="today-todo card-list-todo schedule-todos"
-      action={
+      action={showAddAction ? (
         <button className="quick-add-todo" onClick={() => openModal("addTodo")}>
           <Plus /> 新建待办
         </button>
-      }
+      ) : null}
     >
       <div className="stats">
         <div>
@@ -788,14 +897,14 @@ function ScheduleTodoPanel({
         </div>
       </div>
       <div className="todo-sub">
-        <span>正在推进</span>
+        <span>{mobileTimeline && <CalendarDays aria-hidden="true" />} {mobileTimeline ? "定时待办" : "正在推进"}</span>
         <TodoSortControl mode={sortMode} setMode={setSortMode} labels={sortLabels} />
       </div>
       <div className="dashboard-task-scroll grouped-task-scroll">
-        <Cards items={progress} />
+        <Cards items={progress} timeline={mobileTimeline} />
         <div className="anytime-drop-zone" onDragOver={(e) => e.preventDefault()} onDrop={moveToAnytime}>
           <div className="anytime-heading">
-            <span>随时待办</span>
+            <span>{mobileTimeline && <NotebookPen aria-hidden="true" />} 随时待办</span>
           </div>
           <Cards items={anytime} />
         </div>
@@ -1145,6 +1254,19 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
           </div>
         </div>
       </Section>
+      {timelineOnly && (
+        <div className="mobile-timeline-task-panel">
+          <ScheduleTodoPanel
+            tasks={tasks}
+            setTasks={setTasks}
+            scheduled={dayScheduled}
+            selectedDateKey={selectedKey}
+            navigate={navigate}
+            openModal={openModal}
+            mobileTimeline
+          />
+        </div>
+      )}
       {!timelineOnly && (
         <ScheduleTodoPanel
           tasks={tasks}
@@ -1271,16 +1393,16 @@ function MobileOverview({ tasks, openModal, navigate }) {
             <CircularProgress value={completion} />
           </i>
         </button>
-        <button onClick={() => navigate("timeline")}>
-          <span>时间轴</span>
+        <button onClick={() => navigate("todo")}>
+          <span>定时待办</span>
           <strong>{scheduled.length}</strong>
           <small>个日程安排</small>
           <i className="overview-card-mark" aria-hidden="true"><CalendarDays /></i>
         </button>
         <button onClick={() => jumpTo("life-content")}>
-          <span>事项习惯</span>
+          <span>生活关注</span>
           <strong>{matters.length}</strong>
-          <small>个生活事项</small>
+          <small>个正在展开</small>
           <i className="overview-card-mark" aria-hidden="true"><ListChecks /></i>
         </button>
       </div>
@@ -1343,8 +1465,23 @@ function TimelinePage({ navigate, openModal, tasks, setTasks }) {
 }
 
 function Dashboard({ navigate, openModal, tasks, setTasks, realmVersion }) {
-  const [orderedRealms, setOrderedRealms] = useState(() => [...realms]);
+  const [orderedRealms, setOrderedRealms] = useState(() => {
+    const saved = JSON.parse(localStorage.getItem("liva-realm-order") || "[]");
+    return [...realms].sort((a, b) => {
+      const ai = saved.indexOf(a.name), bi = saved.indexOf(b.name);
+      return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+    });
+  });
   const [draggedRealm, setDraggedRealm] = useState(null);
+  const moveRealm = (source, target) => setOrderedRealms((current) => {
+    const next = [...current], from = next.findIndex((r) => r.name === source), to = next.findIndex((r) => r.name === target);
+    if (from < 0 || to < 0) return current;
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    localStorage.setItem("liva-realm-order", JSON.stringify(next.map((r) => r.name)));
+    return next;
+  });
+  const bindRealmTouch = useTouchReorder(moveRealm);
   const reorderRealm = (to) => {
     if (draggedRealm === null || draggedRealm === to) return;
     setOrderedRealms((current) => {
@@ -1372,13 +1509,14 @@ function Dashboard({ navigate, openModal, tasks, setTasks, realmVersion }) {
       >
         <div className="realms">
           {orderedRealms.map((r, i) => (
-            <div className="draggable-board-card" draggable onDragStart={(e) => {
+            <div className="draggable-board-card" data-touch-order={r.name} draggable onDragStart={(e) => {
               setDraggedRealm(i);
               e.dataTransfer.effectAllowed = "move";
             }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
               e.preventDefault();
               reorderRealm(i);
             }} onDragEnd={() => setDraggedRealm(null)} key={r.name}>
+              <button className="mobile-reorder-handle" aria-label={`调整${r.name}顺序`} {...bindRealmTouch(r.name)}><GripVertical /></button>
               <RealmCard
                 realm={r}
                 matters={matters}
@@ -1392,7 +1530,7 @@ function Dashboard({ navigate, openModal, tasks, setTasks, realmVersion }) {
       <Section
         id="life-content"
         title="生活事项"
-        sub="把生活关注，拆成每天可做的小事"
+        sub="记录长期关注，也安放当下想做的事"
         action={
           <button
             className="outline matter-add"
@@ -1693,10 +1831,27 @@ function MattersPage({ navigate, openModal, tasks = [] }) {
 }
 function TodoPage({ navigate, openModal, tasks, setTasks }) {
   const [sortMode, setSortMode] = useState("time"),
+    [mobileSelectedDate, setMobileSelectedDate] = useState(() => new Date()),
+    mobileDateInput = useRef(null),
     sortLabels = { time: "按时间", realm: "按版图", status: "按状态" },
+    isMobile = window.matchMedia?.("(max-width: 800px)").matches,
     todayKey = new Date().toLocaleDateString("en-CA"),
+    mobileSelectedKey = mobileSelectedDate.toLocaleDateString("en-CA"),
+    selectedDateKey = isMobile ? mobileSelectedKey : todayKey,
+    mobileSelectedLabel = `${mobileSelectedDate.getMonth() + 1}月${mobileSelectedDate.getDate()}日 · 周${["日", "一", "二", "三", "四", "五", "六"][mobileSelectedDate.getDay()]}${mobileSelectedKey === todayKey ? " · 今天" : ""}`,
+    weekStart = (() => {
+      const date = new Date(mobileSelectedDate), day = date.getDay() || 7;
+      date.setHours(12, 0, 0, 0);
+      date.setDate(date.getDate() - day + 1);
+      return date;
+    })(),
+    mobileWeekDays = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + index);
+      return date;
+    }),
     rawVisibleTasks = tasks.filter(
-      (t) => !t.archived && Boolean(t.date) && taskOccursOnDate(t, todayKey),
+      (t) => !t.archived && Boolean(t.date) && taskOccursOnDate(t, selectedDateKey),
     ),
     taskClock = (task) =>
       task.clock || `${task.meta || ""} ${task.time || ""}`.match(/\d{1,2}:\d{2}/)?.[0] || "99:99",
@@ -1708,9 +1863,93 @@ function TodoPage({ navigate, openModal, tasks, setTasks }) {
         return Number(a.done) - Number(b.done) || Number(b.level === "late") - Number(a.level === "late");
       return taskClock(a).localeCompare(taskClock(b), "zh-CN", { numeric: true });
     }),
-    arrangedTasks = visibleTasks.filter(
+    arrangedSource = isMobile
+      ? tasks.filter((task) => {
+          if (task.done || task.archived) return false;
+          if (task.date) return taskOccursOnDate(task, selectedDateKey);
+          return /(?:今天|今晚)/.test(`${task.meta || ""} ${task.time || ""}`) && selectedDateKey === todayKey;
+        })
+      : visibleTasks,
+    arrangedTasks = arrangedSource.filter(
       (t) => !t.done && /\d{1,2}:\d{2}/.test(`${t.meta || ""} ${t.time || ""}`),
+    ),
+    mobileScheduled = arrangedTasks.map((task) => ({
+      id: task.id,
+      taskId: task.id,
+      title: task.title,
+      start: Number((task.clock || taskClock(task)).split(":")[0]) + Number((task.clock || taskClock(task)).split(":")[1] || 0) / 60,
+      duration: task.durationHours || 1,
+      dateKey: selectedDateKey,
+    }));
+  if (isMobile) {
+    return (
+      <div className="todo-page-shell mobile-todo-timeline-page">
+        <Header
+          title="待办事项"
+          mobileTitle="下午好， May"
+          openModal={openModal}
+          navigate={navigate}
+        />
+        <div className="todo-page-head">
+          <div>
+            <span>今天</span>
+            <h1>待办事项</h1>
+            <p>按时间看清今天，也给随时可做的事留一点余地。</p>
+          </div>
+          <button onClick={() => openModal("addTodo")}>
+            <Plus /> 新建待办
+          </button>
+        </div>
+        <div className="mobile-todo-timeline-list">
+          <div className="mobile-week-picker">
+            <div className="mobile-week-days" role="group" aria-label="选择日期">
+              {mobileWeekDays.map((date) => {
+                const key = date.toLocaleDateString("en-CA"),
+                  selected = key === mobileSelectedKey;
+                return (
+                  <button
+                    type="button"
+                    className={selected ? "active" : ""}
+                    onClick={() => setMobileSelectedDate(new Date(date))}
+                    aria-pressed={selected}
+                    key={key}
+                  >
+                    <span>{["日", "一", "二", "三", "四", "五", "六"][date.getDay()]}</span>
+                    <b>{date.getDate()}</b>
+                  </button>
+                );
+              })}
+            </div>
+            <button className="mobile-calendar-trigger" type="button" tabIndex="-1" aria-hidden="true">
+              <CalendarDays />
+            </button>
+            <input
+              ref={mobileDateInput}
+              className="mobile-calendar-input"
+              type="date"
+              value={mobileSelectedKey}
+              onChange={(event) => {
+                if (event.target.value) setMobileSelectedDate(new Date(`${event.target.value}T12:00:00`));
+              }}
+              aria-label="打开日期选择"
+            />
+          </div>
+          <ScheduleTodoPanel
+            tasks={tasks}
+            setTasks={setTasks}
+            scheduled={mobileScheduled}
+            selectedDateKey={selectedDateKey}
+            navigate={navigate}
+            openModal={openModal}
+            mobileTimeline
+            sectionTitle="每日概览"
+            sectionSub={mobileSelectedLabel}
+            showAddAction={false}
+          />
+        </div>
+      </div>
     );
+  }
   return (
     <div className="todo-page-shell">
       <Header
@@ -1776,7 +2015,7 @@ function TodoPage({ navigate, openModal, tasks, setTasks }) {
             </div>
           </div>
           <TodoList
-            tasks={visibleTasks}
+            tasks={isMobile ? visibleTasks.filter((task) => !task.done) : visibleTasks}
             setTasks={setTasks}
             openModal={openModal}
             full
@@ -3268,7 +3507,7 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
 function QuickTodoModal({ close, setTasks, initialTag = "" }) {
   const defaultTodoTheme = realms[3] || { color: "#91aace", tint: "#fafbfd" };
   const [title, setTitle] = useState(""),
-    [tag, setTag] = useState(initialTag || "临时代办事项"),
+    [tag, setTag] = useState(initialTag || "临时待办事项"),
     [selectedRealmName, setSelectedRealmName] = useState(() =>
       initialTag
         ? realms.find((r) => r.directions.includes(initialTag))?.name || ""
@@ -3284,7 +3523,8 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
     [note, setNote] = useState(""),
     [subtasks, setSubtasks] = useState([]),
     [subtaskDraft, setSubtaskDraft] = useState(""),
-    [detailsOpen, setDetailsOpen] = useState(false);
+    [detailsOpen, setDetailsOpen] = useState(false),
+    isMobile = window.matchMedia?.("(max-width: 800px)").matches;
   const realm = realms.find((r) => r.name === selectedRealmName) || defaultTodoTheme,
     availableItems = selectedRealmName
       ? matters.filter(
@@ -3304,7 +3544,7 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
         {
           id: Date.now(),
           title: title.trim(),
-          tag: tag || (selectedRealmName === "Admin" ? "临时代办事项" : "收集箱"),
+          tag: tag || (selectedRealmName === "Admin" ? "临时待办事项" : "收集箱"),
           realm: selectedRealmName || undefined,
           time: taskTime,
           level: "normal",
@@ -3327,7 +3567,7 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
   return (
     <div className="modal-backdrop quick-todo-backdrop" onClick={close}>
       <section
-        className="quick-todo-modal refined-quick-todo"
+        className={`quick-todo-modal refined-quick-todo unified-todo-create ${isMobile ? "unified-todo-edit" : ""}`}
         data-realm={realm.name}
         style={{ "--c": realm.color, "--t": realm.tint }}
         onClick={(e) => e.stopPropagation()}
@@ -3346,13 +3586,11 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
         </header>
         <label className="quick-title">
           <span>待办内容</span>
-          <textarea
-            autoFocus
-            rows="3"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="准备做什么？"
-          />
+          {isMobile ? (
+            <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="准备做什么？" />
+          ) : (
+            <textarea autoFocus rows="3" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="准备做什么？" />
+          )}
         </label>
         <div className="quick-mobile-actions" aria-label="待办快捷设置">
           <button onClick={() => setDetailsOpen(true)}>
@@ -3378,7 +3616,7 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
           <ChevronDown />
         </button>
         <section
-          className={`quick-form-section ${detailsOpen ? "" : "quick-collapsed-details"}`}
+          className={`quick-form-section ${detailsOpen || isMobile ? "" : "quick-collapsed-details"}`}
         >
           <div className="quick-section-title">
             <span>详细信息</span>
@@ -3545,9 +3783,21 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
             </div>
           )}
         </section>
-        <button className="quick-save" disabled={!title.trim()} onClick={save}>
-          <Check /> 保存待办
-        </button>
+        {isMobile ? (
+          <footer className="unified-todo-footer create-todo-footer">
+            <span />
+            <div>
+              <button type="button" onClick={close}>取消</button>
+              <button className="quick-save" disabled={!title.trim()} onClick={save}>
+                <Check /> 保存待办
+              </button>
+            </div>
+          </footer>
+        ) : (
+          <button className="quick-save" disabled={!title.trim()} onClick={save}>
+            <Check /> 保存待办
+          </button>
+        )}
       </section>
     </div>
   );
@@ -3768,6 +4018,301 @@ function Modal({ type, close, navigate, tasks, setTasks, onDataChange }) {
     </div>
   );
 }
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseAssistantTask(input) {
+  let title = input.trim();
+  const result = {
+    type: "create",
+    title: "",
+    tag: "临时待办事项",
+    realm: "Admin",
+    date: localDateKey(),
+    time: "今天",
+    repeat: "",
+    scheduleLabel: "今天",
+  };
+  title = title
+    .replace(/^(?:微光[，,\s]*)?(?:麻烦)?(?:请)?(?:你)?(?:帮我|替我|给我)?(?:增加|新增|添加|创建|记下|安排|设置|设定)(?:一下)?(?:一(?:个|条|项))?[，,：:\s]*/i, "")
+    .replace(/[，,。.!！?？\s]*(?:的)?(?:待办|事项|任务|提醒)[。.!！?？\s]*$/i, "")
+    .trim();
+
+  const clock = title.match(/(?:上午|早上|下午|晚上|今晚)?\s*(\d{1,2})(?:点|时)(半|\d{1,2}分?)?/);
+  if (clock) {
+    let hour = Number(clock[1]);
+    if (/(下午|晚上|今晚)/.test(clock[0]) && hour < 12) hour += 12;
+    const minute = clock[2] === "半" ? 30 : Number(String(clock[2] || "0").replace("分", ""));
+    const value = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    result.time = value;
+    title = title.replace(clock[0], "").trim();
+  }
+
+  const repeatRules = [
+    [/(每个工作日|工作日每天)/, "weekdays", "每个工作日"],
+    [/(每天|每日|天天|每早|每天早上|每晚|每天晚上)/, "daily", "每天"],
+    [/(每周|每星期)/, "weekly", "每周"],
+    [/(每月)/, "monthly", "每月"],
+    [/(每年)/, "yearly", "每年"],
+  ];
+  const repeatRule = repeatRules.find(([pattern]) => pattern.test(title));
+  if (repeatRule) {
+    result.repeat = repeatRule[1];
+    result.scheduleLabel = `${repeatRule[2]}${result.time !== "今天" ? ` · ${result.time}` : ""}`;
+    result.time = result.time === "今天" ? repeatRule[2] : result.time;
+    title = title.replace(repeatRule[0], "").trim();
+  } else if (/明天/.test(title)) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    result.date = localDateKey(tomorrow);
+    result.scheduleLabel = result.time === "今天" ? "明天" : `明天 · ${result.time}`;
+    if (result.time === "今天") result.time = "明天";
+    title = title.replace(/明天/, "").trim();
+  } else {
+    const weekday = title.match(/(?:这|本|下)?周([一二三四五六日天])/);
+    if (weekday) {
+      const index = "日一二三四五六".indexOf(weekday[1] === "天" ? "日" : weekday[1]);
+      const target = new Date();
+      let offset = (index - target.getDay() + 7) % 7;
+      if (/下周/.test(weekday[0])) offset += offset === 0 ? 7 : 7;
+      target.setDate(target.getDate() + offset);
+      result.date = localDateKey(target);
+      result.scheduleLabel = `${weekday[0]}${result.time !== "今天" ? ` · ${result.time}` : ""}`;
+      if (result.time === "今天") result.time = weekday[0];
+      title = title.replace(weekday[0], "").trim();
+    } else if (result.time !== "今天") {
+      result.scheduleLabel = `今天 · ${result.time}`;
+    }
+  }
+
+  result.title = title
+    .replace(/^(?:要|去|做|开始|坚持)\s*/, "")
+    .replace(/[，,。.!！?？\s]*(?:的)?(?:待办|事项|任务|提醒)[。.!！?？\s]*$/i, "")
+    .trim() || "新的生活事项";
+  return result;
+}
+
+function migrateAssistantPersonaText(text = "") {
+  return String(text)
+    .replaceAll("栗子", "微光")
+    .replaceAll("今日待办汇报来了喵", "今日星光简报来了")
+    .replaceAll("喵", "")
+    .replaceAll("用爪子按住", "先替你标记")
+    .replaceAll("动爪", "调整星轨")
+    .replaceAll("叼进待办", "放进生活星轨")
+    .replaceAll("巡视", "照亮");
+}
+
+function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply }) {
+  const { profile } = useLivaProfile();
+  const hour = new Date().getHours();
+  const dayGreeting = hour < 6 ? "还没睡呀" : hour < 11 ? "早上好" : hour < 14 ? "中午好" : hour < 18 ? "下午好" : "晚上好";
+  const [draft, setDraft] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
+  const streamRef = useRef(null);
+  const [messages, setMessages] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("liva-assistant-messages"));
+      if (Array.isArray(saved) && saved.length)
+        return saved.map((message) => message.role === "assistant" ? { ...message, text: migrateAssistantPersonaText(message.text) } : message);
+    } catch {}
+    return [{
+      role: "assistant",
+      text: `${dayGreeting}，${profile.name}。我是微光，刚刚替你照了一遍今天的生活版图。想先点亮最重要的一件事，还是听听今日简报？`,
+    }];
+  });
+  const [pending, setPending] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("liva-assistant-pending")); } catch { return null; }
+  });
+  const activeTasks = tasks.filter((task) => !task.done && !task.archived);
+  const lateTasks = activeTasks.filter((task) => task.level === "late");
+  const completedTasks = tasks.filter((task) => task.done && !task.archived);
+  const nextTimedTask = activeTasks
+    .filter((task) => /\d{1,2}:\d{2}/.test(`${task.clock || ""} ${task.time || ""}`))
+    .sort((a, b) => `${a.clock || a.time}`.localeCompare(`${b.clock || b.time}`, "zh-CN"))[0];
+  const [broadcastEnabled, setBroadcastEnabled] = useState(() => localStorage.getItem("liva-evening-broadcast") !== "off");
+  useEffect(() => localStorage.setItem("liva-evening-broadcast", broadcastEnabled ? "on" : "off"), [broadcastEnabled]);
+  useEffect(() => {
+    const stream = streamRef.current;
+    if (stream) stream.scrollTop = stream.scrollHeight;
+  }, [messages, pending, isThinking]);
+  const buildDailyBroadcast = () => {
+    const isWorkTask = (task) => {
+      const realm = realmForTask(task);
+      return realm.name === "Fortune" || /工作|合同|采购|项目|会议|材料|资金/.test(`${task.tag || ""}${task.title}`);
+    };
+    const workTasks = activeTasks.filter(isWorkTask);
+    const completedWorkTasks = completedTasks.filter(isWorkTask);
+    const habitTasks = activeTasks.filter((task) => task.repeat && !workTasks.includes(task));
+    const otherTasks = activeTasks.filter((task) => !workTasks.includes(task) && !habitTasks.includes(task));
+    const activeMemos = inspirationMemos.filter((memo) => !memo.done);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowKey = localDateKey(tomorrow);
+    const tomorrowTasks = tasks.filter((task) => !task.done && !task.archived && task.date && taskOccursOnDate(task, tomorrowKey));
+    const formatItems = (items, prefix = "•") => items.length
+      ? items.map((item, index) => `${prefix === "letter" ? `${String.fromCharCode(65 + index)}.` : prefix} ${item.title}${item.time ? `（${item.time}）` : ""}`).join("\n")
+      : "暂时没有";
+    const sections = [
+      "今日星光简报来了。微光已经替你按轻重梳理好了。",
+      `💼 今日工作安排（${completedWorkTasks.length}/${workTasks.length + completedWorkTasks.length}）\n${formatItems(workTasks)}`,
+    ];
+    if (habitTasks.length) sections.push(`🌱 今日习惯\n${formatItems(habitTasks, "letter")}`);
+    if (otherTasks.length) sections.push(`📌 今日其他待办\n${formatItems(otherTasks)}`);
+    if (activeMemos.length) sections.push(`📝 灵感清单（随时待办，${activeMemos.length}项）\n${activeMemos.map((memo, index) => `${String.fromCharCode(97 + index)}. ${memo.text}`).join("\n")}`);
+    sections.push(`✅ 今日已完成（${completedTasks.length}项）\n${formatItems(completedTasks, "✅")}`);
+    sections.push(`📅 明天日程（${tomorrow.getMonth() + 1}/${tomorrow.getDate()}）\n${formatItems(tomorrowTasks, "⏰")}`);
+    const priority = workTasks.length
+      ? `今天工作里的 ${workTasks.length} 项是主线。先点亮最重要的一件，微光会替你守住其余节奏。`
+      : habitTasks.length
+        ? "今天没有紧急工作，稳稳完成习惯就很好。微光陪你一步一步来。"
+        : "今天的安排不拥挤，挑一件最想推进的先开始吧。微光会一直亮着。";
+    return `${sections.join("\n\n")}\n\n${priority}`;
+  };
+  useEffect(() => {
+    localStorage.setItem("liva-assistant-messages", JSON.stringify(messages.slice(-100)));
+  }, [messages]);
+  useEffect(() => {
+    if (pending) localStorage.setItem("liva-assistant-pending", JSON.stringify(pending));
+    else localStorage.removeItem("liva-assistant-pending");
+  }, [pending]);
+
+  const respond = async (rawText) => {
+    const text = rawText.trim();
+    if (!text || isThinking) return;
+    const history = messages;
+    setMessages((value) => [...value, { role: "user", text }]);
+    setDraft("");
+    setIsThinking(true);
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          history,
+          context: {
+            profile: { name: profile.name },
+            tasks: tasks.filter((task) => !task.archived).map(({ id, title, tag, realm, date, time, repeat, done, level }) => ({ id, title, tag, realm, date, time, repeat, done: Boolean(done), level })),
+            realms: realms.map((realm) => ({ name: realm.name, note: getRealmNote(realm), directions: realm.directions })),
+            matters: matters.filter((matter) => !matter.archived).map(({ title, realm, state, kind, note }) => ({ title, realm, state, kind, note })),
+            inspirationMemos: inspirationMemos.map(({ text: memoText, time, done }) => ({ text: memoText, time, done })),
+          },
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "AI 服务暂时不可用");
+      if (result.action) setPending(result.action);
+      setMessages((value) => [...value, {
+        role: "assistant",
+        kind: result.reply.includes("\n") ? "report" : undefined,
+        text: result.reply,
+      }]);
+      onAssistantReply?.();
+    } catch (error) {
+      setMessages((value) => [...value, { role: "assistant", kind: "error", text: error.message }]);
+      onAssistantReply?.();
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  const confirmCreate = () => {
+    if (!pending) return;
+    const actionType = pending.type === "create" ? "create_task" : pending.type;
+    if (actionType === "create_task") {
+      setTasks((value) => [...value, { id: Date.now(), title: pending.title, tag: pending.tag || "临时待办事项", realm: "Admin", date: pending.date || localDateKey(), time: pending.time || "今天", repeat: pending.repeat || undefined, level: "normal", done: false }]);
+    } else if (actionType === "update_task") {
+      setTasks((value) => value.map((task) => task.id === pending.taskId ? { ...task, ...(pending.title ? { title: pending.title } : {}), ...(pending.date ? { date: pending.date } : {}), ...(pending.time ? { time: pending.time } : {}), ...(pending.repeat ? { repeat: pending.repeat } : {}), ...(pending.tag ? { tag: pending.tag } : {}) } : task));
+    } else if (actionType === "complete_task") {
+      setTasks((value) => value.map((task) => task.id === pending.taskId ? { ...task, done: true } : task));
+    } else if (actionType === "delete_task") {
+      setTasks((value) => value.filter((task) => task.id !== pending.taskId));
+    }
+    const actionLabel = { create_task: "添加", update_task: "更新", complete_task: "完成", delete_task: "删除" }[actionType] || "处理";
+    const targetTitle = pending.title || tasks.find((task) => task.id === pending.taskId)?.title || "这件事项";
+    setMessages((value) => [...value, {
+      role: "assistant",
+      text: `完成，已经${actionLabel}「${targetTitle}」。微光把它放进了你的生活星轨，会继续替你留意。`,
+    }]);
+    setPending(null);
+  };
+
+  const suggestions = [
+    ["今天有什么要紧的？", "帮我总结今天的进展"],
+    ["检查逾期事项", "有哪些逾期事项？"],
+    ["记录一件新事情", "帮我添加周五整理旅行照片"],
+  ];
+  return (
+    <div className="assistant-page">
+      <header className="assistant-header">
+        <button className="assistant-mobile-back" onClick={() => navigate("today")} aria-label="返回首页"><ChevronLeft /></button>
+        <div className="assistant-mark"><Sparkles /></div>
+        <div><h1>微光</h1><p><i /> Liva 里的生活星光 · 正为你亮着</p></div>
+        <button className="assistant-history" onClick={() => openModal("notice")} aria-label="查看播报"><Bell /></button>
+      </header>
+      <div className="assistant-layout">
+        <section className="assistant-conversation">
+          <div className="assistant-stream" aria-live="polite" ref={streamRef}>
+            <div className="assistant-day"><span>今天</span></div>
+            {messages.map((message, index) => (
+              <div className={`assistant-message ${message.role} ${message.kind || ""}`} key={`${message.role}-${index}`}>
+                {message.role === "assistant" && <span><Sparkles /></span>}
+                <p>{message.text}</p>
+              </div>
+            ))}
+            {isThinking && <div className="assistant-message assistant thinking"><span><Sparkles /></span><p>微光正在梳理你的想法…</p></div>}
+            {pending && (
+              <article className="assistant-action-preview">
+                <header><ListChecks /><div><b>微光准备调整星轨</b><small>确认后才会写入 Liva</small></div></header>
+                <div><span>操作</span><strong>{{ create_task: "新建待办", update_task: "修改待办", complete_task: "完成待办", delete_task: "删除待办", create: "新建待办" }[pending.type] || "调整事项"}</strong></div>
+                <div><span>事项</span><strong>{pending.title || tasks.find((task) => task.id === pending.taskId)?.title || "待确认事项"}</strong></div>
+                {(pending.date || pending.time || pending.repeat || pending.scheduleLabel) && <div><span>时间</span><strong>{pending.scheduleLabel || [pending.date, pending.time, repeatLabel(pending.repeat)].filter(Boolean).join(" · ")}</strong></div>}
+                {pending.tag && <div><span>归属</span><strong>{pending.tag}</strong></div>}
+                <footer><button onClick={() => setPending(null)}>暂不执行</button><button onClick={confirmCreate}><Check /> 确认执行</button></footer>
+              </article>
+            )}
+          </div>
+          {messages.length === 1 && (
+            <div className="assistant-suggestions">
+              {suggestions.map(([label, prompt]) => <button onClick={() => respond(prompt)} key={label}><span>{label}</span><ChevronRight /></button>)}
+            </div>
+          )}
+          <form className="assistant-composer" onSubmit={(event) => { event.preventDefault(); respond(draft); }}>
+            <button type="button" aria-label="语音输入"><Mic /></button>
+            <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="和微光说说，或交给它一件事…" />
+            <button className="assistant-send" type="submit" disabled={!draft.trim() || isThinking} aria-label="发送"><Send /></button>
+          </form>
+          <p className="assistant-note">涉及修改的操作，会先向你确认</p>
+        </section>
+        <aside className="assistant-context">
+          <section className="assistant-identity">
+            <div className="assistant-star-portrait"><Sparkles /><span className="star-orbit" /></div>
+            <div><small>你的生活星光</small><h2>微光</h2><p>一颗温柔、清醒，也很会发现重点的小星星。它记得你的节奏，每次改变生活星轨前都会先问你。</p></div>
+          </section>
+          <section className="assistant-brief">
+            <h3>今天值得留意</h3>
+            <div className="assistant-attention-list">
+              <div><CircleAlert /><span><b>{activeTasks.length ? `还有 ${activeTasks.length} 件事项待处理` : "今天的事情都安顿好了"}</b><small>{lateTasks.length ? `${lateTasks.length} 件需要重新安排，建议先处理` : `已经完成 ${completedTasks.length} 件，按现在的节奏就好`}</small></span></div>
+              <div><CalendarDays /><span><b>{nextTimedTask ? `${(`${nextTimedTask.clock || nextTimedTask.time}`).match(/\d{1,2}:\d{2}/)?.[0]}　${nextTimedTask.title}` : "今天暂无固定时间安排"}</b><small>{nextTimedTask ? `${nextTimedTask.tag || "生活事项"} · 到点前会再提醒你` : "随时可以让微光帮你安排"}</small></span></div>
+            </div>
+            <button onClick={() => respond("微光，播报一下今天的安排")}>查看今日安排 <ChevronRight /></button>
+          </section>
+          <section className="assistant-broadcast">
+            <header><h3>提醒设置</h3><button aria-label="播报设置" onClick={() => openModal("settings")}><Settings /></button></header>
+            <div className="assistant-reminder-row"><Bell /><span><b>晚间播报　21:30</b><small>汇总当天进展与明日安排</small></span><button className={`assistant-broadcast-switch ${broadcastEnabled ? "on" : ""}`} aria-label="晚间播报开关" aria-pressed={broadcastEnabled} onClick={() => setBroadcastEnabled((value) => !value)}><i /></button></div>
+            <button className="assistant-reminder-link" onClick={() => openModal("settings")}>调整提醒时间 <ChevronRight /></button>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 function QuickSidebar({
   page,
   navigate,
@@ -3775,6 +4320,7 @@ function QuickSidebar({
   collapsed,
   setCollapsed,
   tasks,
+  assistantUnread,
 }) {
   const [active, setActive] = useState("dashboard-top"),
     items = [
@@ -3806,6 +4352,15 @@ function QuickSidebar({
       aria-label="板块快捷导航"
     >
       <nav>
+        <button
+          className={`sidebar-assistant ${page === "assistant" ? "active" : ""} ${assistantUnread ? "has-assistant-unread" : ""}`.trim()}
+          onClick={() => navigate("assistant")}
+          title="微光"
+          aria-label="打开微光助手"
+        >
+          <Sparkles />
+          <span>微光</span>
+        </button>
         {items.map(([id, label, Icon]) => (
           <button
             className={active === id ? "active" : ""}
@@ -3881,7 +4436,7 @@ function QuickSidebar({
   );
 }
 
-function MobileNav({ page, navigate, openModal }) {
+function MobileNav({ page, navigate, openModal, assistantUnread }) {
   return (
     <nav className="mobile-nav">
       <button
@@ -3892,18 +4447,19 @@ function MobileNav({ page, navigate, openModal }) {
         <span>首页</span>
       </button>
       <button
-        className={page === "todo" ? "active" : ""}
+        className={["todo", "timeline"].includes(page) ? "active" : ""}
         onClick={() => navigate("todo")}
       >
         <ListChecks />
         <span>待办</span>
       </button>
       <button
-        className={page === "timeline" ? "active" : ""}
-        onClick={() => navigate("timeline")}
+        className={`${page === "assistant" ? "active" : ""} ${assistantUnread ? "has-assistant-unread" : ""}`.trim()}
+        onClick={() => navigate("assistant")}
+        aria-label={assistantUnread ? "微光有新消息" : "打开微光"}
       >
-        <Clock3 />
-        <span>时间轴</span>
+        <span className="mobile-nav-icon"><Sparkles />{assistantUnread && <i className="assistant-unread-dot" />}</span>
+        <span>微光</span>
       </button>
       <button
         className={page === "profile" ? "active" : ""}
@@ -3918,7 +4474,7 @@ function MobileNav({ page, navigate, openModal }) {
 
 function MobileQuickCapture({ page, openModal }) {
   const [open, setOpen] = useState(false),
-    visible = ["today", "todo", "timeline"].includes(page),
+    visible = ["today", "todo"].includes(page),
     choose = (modal) => {
       setOpen(false);
       openModal(modal);
@@ -4170,10 +4726,13 @@ function App() {
     [closingLayers, setClosingLayers] = useState([]),
     [tasks, setTasks] = useState(initialTasks),
     [notificationReadIds, setNotificationReadIds] = useState([]),
+    [assistantUnread, setAssistantUnread] = useState(() => localStorage.getItem("liva-assistant-unread") === "1"),
     [sidebarCollapsed, setSidebarCollapsed] = useState(true),
     [realmVersion, setRealmVersion] = useState(0),
     [user, setUser] = useState(null),
     [profile, setProfile] = useState(savedProfile);
+  const pageRef = useRef(page);
+  pageRef.current = page;
   const saveProfile = React.useCallback((nextProfile) => {
     setProfile(nextProfile);
     localStorage.setItem("liva-profile", JSON.stringify(nextProfile));
@@ -4290,6 +4849,10 @@ function App() {
       openModal(p);
       return;
     }
+    if (p === "assistant") {
+      setAssistantUnread(false);
+      localStorage.removeItem("liva-assistant-unread");
+    }
     setPage(p);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [openModal]);
@@ -4308,7 +4871,14 @@ function App() {
       />
     );
   else if (page === "timeline")
-    content = (
+    content = window.matchMedia?.("(max-width: 800px)").matches ? (
+      <TodoPage
+        navigate={navigate}
+        openModal={openModal}
+        tasks={tasks}
+        setTasks={setTasks}
+      />
+    ) : (
       <TimelinePage
         navigate={navigate}
         openModal={openModal}
@@ -4318,6 +4888,21 @@ function App() {
     );
   else if (page === "profile")
     content = <MemoProfilePage navigate={navigate} openModal={openModal} />;
+  else if (page === "assistant")
+    content = (
+      <AssistantPage
+        tasks={tasks}
+        setTasks={setTasks}
+        navigate={navigate}
+        openModal={openModal}
+        onAssistantReply={() => {
+          if (document.hidden || pageRef.current !== "assistant") {
+            setAssistantUnread(true);
+            localStorage.setItem("liva-assistant-unread", "1");
+          }
+        }}
+      />
+    );
   else if (page.startsWith("realm-"))
     content = (
       <RealmPage
@@ -4349,14 +4934,20 @@ function App() {
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
         tasks={tasks}
+        assistantUnread={assistantUnread}
       />
       <main className="app">
         <div className="mobile-page-transition" key={page}>
           {content}
         </div>
-        <MemoMobileNav page={page} navigate={navigate} openModal={openModal} />
-        <MobileQuickCapture page={page} openModal={openModal} />
       </main>
+      {createPortal(
+        <>
+          <MemoMobileNav page={page} navigate={navigate} openModal={openModal} assistantUnread={assistantUnread} />
+          <MobileQuickCapture page={page} openModal={openModal} />
+        </>,
+        document.body,
+      )}
       {modalStack.map((entry, index) => (
         <div
           className={`modal-layer ${closingLayers.includes(index) ? "is-closing" : ""}`}
@@ -5415,7 +6006,11 @@ function NewRealmModal({ close, onCreated }) {
 }
 function LinkedMatters({ openModal, tasks, refreshVersion }) {
   const [orderedMatters, setOrderedMatters] = useState(() =>
-      matters.filter((item) => item.state === "点亮"),
+      matters.filter((item) => item.state === "点亮").sort((a, b) => {
+        const saved = JSON.parse(localStorage.getItem("liva-matter-order") || "[]"),
+          ai = saved.indexOf(`${a.realm}:${a.title}`), bi = saved.indexOf(`${b.realm}:${b.title}`);
+        return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+      }),
     ),
     [draggedIndex, setDraggedIndex] = useState(null);
   useEffect(() => {
@@ -5450,6 +6045,18 @@ function LinkedMatters({ openModal, tasks, refreshVersion }) {
     });
     setDraggedIndex(null);
   };
+  const moveMatter = (source, target) => setOrderedMatters((current) => {
+    const key = (item) => `${item.realm}:${item.title}`,
+      next = [...current], from = next.findIndex((item) => key(item) === source), to = next.findIndex((item) => key(item) === target);
+    if (from < 0 || to < 0) return current;
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    const active = new Set(next.map(key));
+    matters.splice(0, matters.length, ...next, ...matters.filter((item) => !active.has(key(item))));
+    localStorage.setItem("liva-matter-order", JSON.stringify(next.map(key)));
+    return next;
+  });
+  const bindMatterTouch = useTouchReorder(moveMatter);
   return (
     <div className="goals linked-goals all-linked-goals">
       {orderedMatters.map((item, index) => {
@@ -5459,6 +6066,7 @@ function LinkedMatters({ openModal, tasks, refreshVersion }) {
         return (
           <div
             className="draggable-matter-card"
+            data-touch-order={`${item.realm}:${item.title}`}
             draggable
             onDragStart={(e) => {
               setDraggedIndex(index);
@@ -5473,6 +6081,7 @@ function LinkedMatters({ openModal, tasks, refreshVersion }) {
             onDragEnd={() => setDraggedIndex(null)}
             key={`${item.realm}-${item.title}`}
           >
+          <button className="mobile-reorder-handle" aria-label={`调整${item.title}顺序`} {...bindMatterTouch(`${item.realm}:${item.title}`)}><GripVertical /></button>
           <MatterCard
             item={item}
             index={matterIndex}

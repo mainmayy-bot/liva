@@ -83,4 +83,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "微光刚才没能照清这句话，请稍后再说一次。", detail: error.message });
   }
 }
-
