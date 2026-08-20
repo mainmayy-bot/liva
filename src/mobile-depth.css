@@ -564,6 +564,366 @@
   }
 }
 
+/* Keep the approved mobile realm layout authoritative over legacy overrides below. */
+@media (max-width: 600px) {
+  body .realm-backdrop > section.refined-realm-modal {
+    width: min(calc(100% - 4px), 430px) !important;
+    max-width: 430px !important;
+    height: calc(100dvh - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    border-radius: 28px !important;
+    background: #fff !important;
+  }
+  body .realm-backdrop section.refined-realm-modal > header {
+    grid-template-columns: 64px minmax(0, 1fr) !important;
+    padding: 82px 22px 18px !important;
+    background: #fff !important;
+  }
+  body .realm-backdrop section.refined-realm-modal > .realm-modal-body {
+    padding: 22px 22px 30px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title > button {
+    width: 100% !important;
+    min-height: 46px !important;
+    border: 0 !important;
+    border-radius: 13px !important;
+    background: var(--c) !important;
+    color: #fff !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 11px !important;
+    border: 0 !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid > article {
+    display: block !important;
+    min-height: 190px !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    border: 1px solid #e1e6e3 !important;
+    border-radius: 17px !important;
+    background: #fff !important;
+    padding: 16px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-icon {
+    position: static !important;
+    display: grid !important;
+    width: 46px !important;
+    height: 46px !important;
+    margin: 0 0 25px !important;
+    border-radius: 14px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .matter-title-trigger h4 {
+    color: #222b26 !important;
+    font-size: 15px !important;
+    white-space: normal !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-realm {
+    display: block !important;
+    margin-top: 6px !important;
+    color: #8a938f !important;
+    font-size: 9px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-realm::after { content: none !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state {
+    position: absolute !important;
+    top: 17px !important;
+    right: 14px !important;
+    margin: 0 !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid footer {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: 14px !important;
+    left: 16px !important;
+    display: block !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-0,
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-0 i { color: #5f9270 !important; border-color: #5f9270 !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-1,
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-1 i { color: #c98224 !important; border-color: #c98224 !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-2,
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-2 i { color: #77817d !important; border-color: #77817d !important; }
+}
+
+/* Final mobile realm composition: reference-led layout, existing realm palette. */
+@media (max-width: 600px) {
+  .realm-backdrop {
+    align-items: center !important;
+    padding: 6px !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal {
+    width: min(calc(100% - 4px), 430px) !important;
+    max-width: 430px !important;
+    height: calc(100dvh - 12px) !important;
+    min-height: 0 !important;
+    max-height: calc(100dvh - 12px) !important;
+    border-radius: 28px !important;
+    background: #fff !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal::before {
+    display: none !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > .realm-mobile-back,
+  .realm-backdrop .refined-realm-modal > .modal-close {
+    position: absolute !important;
+    z-index: 10 !important;
+    top: 18px !important;
+    display: grid !important;
+    width: 38px !important;
+    height: 38px !important;
+    place-items: center !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: #f7f8f7 !important;
+    color: #68726d !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > .realm-mobile-back { left: 18px !important; }
+  .realm-backdrop .refined-realm-modal > .modal-close { right: 18px !important; }
+  .realm-backdrop .refined-realm-modal > .realm-mobile-back svg,
+  .realm-backdrop .refined-realm-modal > .modal-close svg { width: 19px !important; height: 19px !important; }
+
+  .realm-backdrop > .refined-realm-modal > .realm-mobile-menu {
+    top: 67px !important;
+    right: 19px !important;
+  }
+
+  .realm-backdrop .realm-mobile-menu-trigger {
+    width: 32px !important;
+    height: 32px !important;
+    background: #f7f8f7 !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > header {
+    display: grid !important;
+    grid-template-columns: 64px minmax(0, 1fr) !important;
+    gap: 15px !important;
+    padding: 82px 22px 18px !important;
+    border-bottom: 0 !important;
+    background: #fff !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > header > span {
+    width: 62px !important;
+    height: 62px !important;
+    margin: 0 !important;
+    border: 1px solid color-mix(in srgb, var(--c) 72%, #fff) !important;
+    border-radius: 19px !important;
+    background: color-mix(in srgb, var(--t) 68%, #fff) !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > header > span svg {
+    width: 27px !important;
+    height: 27px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-head-copy {
+    align-self: center !important;
+    min-width: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-head-copy h2 {
+    margin: 0 0 4px !important;
+    color: #202824 !important;
+    font-size: 27px !important;
+    line-height: 1.12 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-head-copy input {
+    height: 28px !important;
+    color: #7d8782 !important;
+    font-size: 13px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    width: 100% !important;
+    margin: 22px 0 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #e4e8e6 !important;
+    border-radius: 17px !important;
+    background: #fff !important;
+    padding: 7px 0 !important;
+    box-shadow: none !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article {
+    min-height: 54px !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article + article {
+    border-left: 1px solid #e6e9e7 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary b {
+    color: #26302b !important;
+    font-size: 20px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary span {
+    font-size: 9px !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > .realm-modal-body {
+    padding: 22px 22px 30px !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+    margin: 0 0 20px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title h3 {
+    margin-bottom: 7px !important;
+    font-size: 20px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title p {
+    max-width: none !important;
+    font-size: 10px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title > button {
+    width: 100% !important;
+    min-height: 46px !important;
+    border: 0 !important;
+    border-radius: 13px !important;
+    background: var(--c) !important;
+    color: #fff !important;
+    font-size: 12px !important;
+    box-shadow: 0 7px 18px color-mix(in srgb, var(--c) 17%, transparent) !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 11px !important;
+    border: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article {
+    position: relative !important;
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 190px !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    overflow: hidden !important;
+    border: 1px solid #e1e6e3 !important;
+    border-radius: 17px !important;
+    background: #fff !important;
+    padding: 16px !important;
+    box-shadow: 0 5px 16px rgba(37, 49, 43, .035) !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article::after { content: none !important; }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-icon {
+    position: static !important;
+    display: grid !important;
+    width: 46px !important;
+    height: 46px !important;
+    margin: 0 0 25px !important;
+    place-items: center !important;
+    border-radius: 14px !important;
+    background: color-mix(in srgb, var(--t) 72%, #fff) !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-icon svg {
+    width: 21px !important;
+    height: 21px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .matter-title-trigger {
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .matter-title-trigger h4 {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    color: #222b26 !important;
+    font-size: 15px !important;
+    line-height: 1.4 !important;
+    white-space: normal !important;
+    -webkit-box-orient: vertical !important;
+    -webkit-line-clamp: 2 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-realm {
+    display: block !important;
+    margin-top: 6px !important;
+    color: #8a938f !important;
+    font-size: 9px !important;
+    line-height: 1.4 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-realm::after { content: none !important; }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-state {
+    position: absolute !important;
+    top: 17px !important;
+    right: 14px !important;
+    margin: 0 !important;
+    font-size: 9px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-state.status-0 i {
+    color: #5f9270 !important;
+    border-color: #5f9270 !important;
+  }
+  .realm-backdrop .refined-realm-modal .direction-profile-state.status-1 i {
+    color: #c98224 !important;
+    border-color: #c98224 !important;
+  }
+  .realm-backdrop .refined-realm-modal .direction-profile-state.status-2 i {
+    color: #77817d !important;
+    border-color: #77817d !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid footer {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: 14px !important;
+    left: 16px !important;
+    display: block !important;
+    margin: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid footer small {
+    font-size: 9px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-archive-action {
+    right: 12px !important;
+    bottom: 10px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article.is-ended footer {
+    right: 76px !important;
+  }
+}
+
 /* Mobile secondary sheets use the same clean white surface as desktop. */
 @media (max-width: 800px) {
   :is(.modal,.quick-todo-modal,.realm-modal,.content-detail-modal,.notification-panel,.login-modal,.inspiration-modal,.realm-create-modal,.direction-create,.delete-confirm-modal,.profile-edit-modal) {
@@ -1762,4 +2122,550 @@ html[data-theme="dark"] {
   color-scheme: light !important;
   color: #262d29 !important;
   background-color: #fcfdfc !important;
+}
+
+/* Mobile notification sheet: keep filtering compact and preserve space for content. */
+@media (max-width: 650px) {
+  .notice-backdrop > .live-notification-panel > header {
+    padding: 19px 18px 10px !important;
+  }
+
+  .notice-backdrop > .live-notification-panel > header h2 {
+    font-size: 20px !important;
+  }
+
+  .notice-backdrop > .live-notification-panel > nav {
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: 2px !important;
+    margin: 0 16px 5px;
+    overflow-x: auto;
+    padding: 3px !important;
+    border-radius: 12px;
+    background: #f5f7f6;
+    scrollbar-width: none;
+  }
+
+  .notice-backdrop > .live-notification-panel > nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .notice-backdrop > .live-notification-panel > nav button {
+    min-width: max-content;
+    min-height: 34px;
+    flex: 1 0 auto;
+    border-radius: 9px !important;
+    padding: 0 9px !important;
+    color: #75807a;
+    font-size: 10px !important;
+    white-space: nowrap;
+  }
+
+  .notice-backdrop > .live-notification-panel > nav button.active {
+    background: #fff !important;
+    color: #c88932 !important;
+    box-shadow: 0 1px 4px rgba(65, 76, 70, .08);
+  }
+
+  .notice-backdrop .live-notification-panel .notification-scroll {
+    padding: 0 16px 12px !important;
+  }
+
+  .notice-backdrop .live-notification-panel .notification-group h3 {
+    margin: 10px 1px 7px;
+  }
+
+  .notice-backdrop .live-notification-panel .notification-item {
+    margin-bottom: 7px;
+    padding: 10px 11px;
+  }
+}
+
+/* Final mobile realm-card contract: title, realm and status stay in fixed positions. */
+@media (max-width: 600px) {
+  .realm-backdrop .refined-realm-modal .direction-profile-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    border: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article {
+    position: relative !important;
+    display: block !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 128px !important;
+    max-height: 128px !important;
+    aspect-ratio: auto !important;
+    overflow: hidden !important;
+    border: 1px solid #e2e7e4 !important;
+    border-radius: 15px !important;
+    background: #fff !important;
+    padding: 15px 13px !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article:hover,
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article.is-expanded {
+    border-color: color-mix(in srgb, var(--c) 45%, #dfe5e2) !important;
+    box-shadow: 0 5px 15px color-mix(in srgb, var(--c) 7%, transparent) !important;
+    transform: none !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-icon,
+  .realm-backdrop .refined-realm-modal .direction-profile-grid footer {
+    display: none !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .matter-title-trigger {
+    display: block !important;
+    width: calc(100% - 8px) !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .matter-title-trigger h4 {
+    display: -webkit-box !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    color: #27312c !important;
+    font-size: 14px !important;
+    font-weight: 680 !important;
+    line-height: 1.4 !important;
+    text-align: left !important;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-realm {
+    position: absolute !important;
+    left: 13px !important;
+    bottom: 15px !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-realm::after {
+    content: attr(data-mobile-label);
+    color: var(--c);
+    font-size: 10px;
+    font-weight: 550;
+    line-height: 1.2;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-state {
+    position: absolute !important;
+    right: 11px !important;
+    bottom: 11px !important;
+    top: auto !important;
+    display: flex !important;
+    width: auto !important;
+    min-height: 26px !important;
+    align-items: center !important;
+    gap: 4px !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+    padding: 4px 7px !important;
+    font-size: 9px !important;
+    box-shadow: none !important;
+    white-space: nowrap !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-state svg {
+    width: 10px !important;
+    height: 10px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .card-title-editor {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .card-title-editor input {
+    width: calc(100% - 58px) !important;
+    font-size: 12px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-grid > article.is-ended {
+    background: #f5f6f5 !important;
+    opacity: .82 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-archive-action {
+    right: 9px !important;
+    top: 9px !important;
+    bottom: auto !important;
+    width: 27px !important;
+    height: 27px !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    padding: 0 !important;
+    font-size: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-archive-action svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+}
+
+/* Notification sheet keeps a stable frame; only its content list scrolls. */
+@media (max-width: 650px) {
+  .notice-backdrop > .live-notification-panel {
+    height: min(640px, calc(100dvh - 36px)) !important;
+    min-height: min(640px, calc(100dvh - 36px)) !important;
+    max-height: min(640px, calc(100dvh - 36px)) !important;
+    overflow: hidden !important;
+  }
+
+  .notice-backdrop > .live-notification-panel > header,
+  .notice-backdrop > .live-notification-panel > nav,
+  .notice-backdrop > .live-notification-panel > footer {
+    flex: none;
+  }
+
+  .notice-backdrop > .live-notification-panel > .notification-scroll {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* Mobile counterpart of the desktop realm view. */
+@media (max-width: 600px) {
+  .realm-backdrop > .refined-realm-modal {
+    display: flex !important;
+    width: min(calc(100% - 24px), 430px) !important;
+    height: min(720px, calc(100dvh - 28px)) !important;
+    min-height: min(620px, calc(100dvh - 28px)) !important;
+    max-height: min(720px, calc(100dvh - 28px)) !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    border: 1px solid #e1e7e3 !important;
+    border-radius: 26px !important;
+    background: #fff !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > .modal-close {
+    position: absolute !important;
+    top: 17px !important;
+    right: 17px !important;
+    z-index: 8 !important;
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: #f3f6f4 !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > .secondary-delete {
+    display: none !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > .realm-mobile-menu {
+    position: absolute !important;
+    top: 59px !important;
+    right: 17px !important;
+    z-index: 9 !important;
+    display: block !important;
+  }
+
+  .realm-backdrop .realm-mobile-menu-trigger {
+    width: 36px !important;
+    height: 36px !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: #f6f8f7 !important;
+    color: #7e8983 !important;
+  }
+
+  .realm-backdrop .realm-mobile-delete {
+    top: 42px !important;
+    right: 0 !important;
+    min-width: 112px !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > header {
+    display: grid !important;
+    grid-template-columns: 46px minmax(0, 1fr) !important;
+    grid-template-rows: auto auto !important;
+    column-gap: 12px !important;
+    row-gap: 15px !important;
+    align-items: center !important;
+    flex: none !important;
+    margin: 0 !important;
+    padding: 22px 18px 17px !important;
+    border-bottom: 1px solid #edf0ee !important;
+    background: #fff !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > header > span {
+    display: grid !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    width: 44px !important;
+    height: 44px !important;
+    place-items: center !important;
+    margin: 0 !important;
+    border: 1px solid color-mix(in srgb, var(--c) 55%, #dfe5e2) !important;
+    border-radius: 13px !important;
+    background: var(--t) !important;
+    color: var(--c) !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > header > span svg {
+    width: 21px !important;
+    height: 21px !important;
+  }
+
+  .realm-backdrop .realm-head-copy {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding-right: 54px !important;
+  }
+
+  .realm-backdrop .realm-head-copy h2 {
+    margin: 0 0 3px !important;
+    color: #26302b !important;
+    font-size: 21px !important;
+    line-height: 1.2 !important;
+  }
+
+  .realm-backdrop .realm-head-copy input {
+    width: 100% !important;
+    height: 24px !important;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: #87918c !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary {
+    display: grid !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    border: 1px solid #edf0ee !important;
+    border-radius: 13px !important;
+    background: #fafbfa !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article {
+    display: grid !important;
+    min-width: 0 !important;
+    min-height: 56px !important;
+    place-items: center !important;
+    align-content: center !important;
+    gap: 3px !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    padding: 7px 4px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary article + article {
+    border-left: 1px solid #e4e9e6 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary b {
+    color: #303a35 !important;
+    font-size: 17px !important;
+    line-height: 1 !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .realm-backdrop .refined-realm-modal > header .header-summary span {
+    color: #909995 !important;
+    font-size: 8px !important;
+  }
+
+  .realm-backdrop > .refined-realm-modal > .realm-modal-body {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    padding: 18px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    margin: 0 0 14px !important;
+    padding: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title > div {
+    min-width: 0 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title h3 {
+    margin: 0 0 4px !important;
+    color: #27312c !important;
+    font-size: 17px !important;
+    line-height: 1.25 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title p {
+    max-width: 24ch !important;
+    margin: 0 !important;
+    color: #929b96 !important;
+    font-size: 9px !important;
+    line-height: 1.45 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title > button {
+    min-width: 86px !important;
+    min-height: 36px !important;
+    flex: none !important;
+    justify-content: center !important;
+    border: 1px solid color-mix(in srgb, var(--c) 50%, #dfe5e2) !important;
+    border-radius: 11px !important;
+    background: #fff !important;
+    padding: 0 10px !important;
+    box-shadow: none !important;
+    color: var(--c) !important;
+    font-size: 9px !important;
+    font-weight: 600 !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .realm-modal-title > button svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-state,
+  .realm-backdrop .refined-realm-modal .direction-profile-state.status-0,
+  .realm-backdrop .refined-realm-modal .direction-profile-state.status-1,
+  .realm-backdrop .refined-realm-modal .direction-profile-state.status-2 {
+    min-height: 28px !important;
+    gap: 5px !important;
+    border: 0 !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    padding: 2px 0 !important;
+    box-shadow: none !important;
+  }
+
+  .realm-backdrop .refined-realm-modal .direction-profile-state i {
+    position: relative !important;
+    display: grid !important;
+    width: 11px !important;
+    height: 11px !important;
+    flex: none !important;
+    place-items: center !important;
+    border: 1.5px solid currentColor !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 11%, transparent) !important;
+  }
+}
+
+/* Authoritative mobile realm card geometry (must remain last). */
+@media (max-width: 600px) {
+  body .realm-backdrop > section.refined-realm-modal {
+    width: min(calc(100% - 4px), 430px) !important;
+    max-width: 430px !important;
+    height: calc(100dvh - 12px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    border-radius: 28px !important;
+    background: #fff !important;
+  }
+  body .realm-backdrop section.refined-realm-modal > header {
+    grid-template-columns: 64px minmax(0, 1fr) !important;
+    padding: 82px 22px 18px !important;
+    background: #fff !important;
+  }
+  body .realm-backdrop section.refined-realm-modal > .realm-modal-body { padding: 22px 22px 30px !important; }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title > button {
+    width: 100% !important;
+    min-height: 46px !important;
+    border: 0 !important;
+    border-radius: 13px !important;
+    background: var(--c) !important;
+    color: #fff !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 11px !important;
+    border: 0 !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid > article {
+    display: block !important;
+    min-height: 190px !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    border: 1px solid #e1e6e3 !important;
+    border-radius: 17px !important;
+    background: #fff !important;
+    padding: 16px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-icon {
+    position: static !important;
+    display: grid !important;
+    width: 46px !important;
+    height: 46px !important;
+    margin: 0 0 25px !important;
+    border-radius: 14px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .matter-title-trigger h4 {
+    color: #222b26 !important;
+    font-size: 15px !important;
+    white-space: normal !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-realm {
+    display: block !important;
+    margin-top: 6px !important;
+    color: #8a938f !important;
+    font-size: 9px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-realm::after { content: none !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state {
+    position: absolute !important;
+    top: 17px !important;
+    right: 14px !important;
+    margin: 0 !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid footer {
+    position: absolute !important;
+    right: 16px !important;
+    bottom: 14px !important;
+    left: 16px !important;
+    display: block !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-0,
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-0 i { color: #5f9270 !important; border-color: #5f9270 !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-1,
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-1 i { color: #c98224 !important; border-color: #c98224 !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-2,
+  body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-2 i { color: #77817d !important; border-color: #77817d !important; }
 }

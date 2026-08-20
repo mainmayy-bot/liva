@@ -7,6 +7,7 @@ import {
   BookOpen,
   BriefcaseBusiness,
   CalendarDays,
+  Camera,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -33,6 +34,7 @@ import {
   Mail,
   MessageCircle,
   Mountain,
+  Moon,
   Music,
   MoreHorizontal,
   NotebookPen,
@@ -40,6 +42,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PawPrint,
+  Plane,
   Plus,
   RefreshCw,
   Search,
@@ -51,12 +54,14 @@ import {
   Users,
   Utensils,
   Video,
+  WalletCards,
   X,
 } from "lucide-react";
 import "./styles.css";
 import "./refinements.css";
 import "./mobile-home.css";
 import "./mobile-depth.css";
+import "./mobile-realm.css";
 import {
   isSupabaseConfigured,
   loadCloudSnapshot,
@@ -326,20 +331,34 @@ const directionStates = ["点亮", "点亮", "储备", "储备"];
 const matterKinds = ["日常习惯", "长期事项", "一次性项目", "长期事项"];
 
 function iconForMatterName(name = "") {
-  const rules = [
-    [/工作|职业|项目|商业|财务|收入|合同|材料/, BriefcaseBusiness],
-    [/阅读|学习|课程|考试|输入|书|写作/, BookOpen],
-    [/运动|游泳|健身|跑步|健康|身体|舒展/, Dumbbell],
-    [/旅行|出行|探索|路线|城市/, Compass],
-    [/家庭|家务|空间|收纳|居住/, House],
-    [/音乐|乐器|唱歌/, Music],
-    [/关系|朋友|社交|沟通|联络/, Users],
-    [/饮食|做饭|餐|咖啡/, Utensils],
-    [/宠物|猫|狗/, PawPrint],
-    [/摄影|视频|影像/, Video],
-    [/成长|创作|灵感|表达/, Sparkles],
-  ];
-  return rules.find(([pattern]) => pattern.test(name))?.[1] || Sparkles;
+  const normalized = name.trim().toLowerCase(),
+    rules = [
+      [/财务|理财|记账|账单|预算|收入|存款|储蓄|投资|报销|税务/, WalletCards],
+      [/摄影|拍照|相机/, Camera],
+      [/视频|剪辑|影像|电影/, Video],
+      [/睡眠|睡觉|早睡|休息|作息/, Moon],
+      [/旅行|旅游|出行|航班|机票|度假/, Plane],
+      [/路线|导航|城市探索|户外探索/, Compass],
+      [/阅读|读书|书籍|输入/, BookOpen],
+      [/学习|课程|考试|培训|专业成长|技能/, GraduationCap],
+      [/写作|日记|记录|笔记|文案/, NotebookPen],
+      [/运动|游泳|健身|跑步|健康|身体|舒展|瑜伽|减肥|塑形/, Dumbbell],
+      [/工作|职业|办公|商务|合同|采购|运营|会议|汇报|项目/, BriefcaseBusiness],
+      [/日程|时间|计划|安排|提醒|预约/, CalendarDays],
+      [/资料|文件|归档|整理|收纳/, Archive],
+      [/家庭|家务|空间|居住|房间|装修|维护/, House],
+      [/关系|朋友|社交|人脉|家人|同事/, Users],
+      [/沟通|联络|消息|聊天|回复/, MessageCircle],
+      [/饮食|做饭|早餐|午餐|晚餐|咖啡|烘焙|营养/, Utensils],
+      [/宠物|猫|狗|遛狗/, PawPrint],
+      [/音乐|乐器|唱歌|钢琴|吉他/, Music],
+      [/穿搭|服装|风格|审美|美妆|护肤|发型/, Palette],
+      [/创作|创造|灵感|创意|表达/, Lightbulb],
+      [/自然|园艺|植物|花园|环保/, Leaf],
+      [/习惯|打卡|清单|日常|待办/, ListChecks],
+      [/情绪|心理|冥想|放松|自我关怀/, Heart],
+    ];
+  return rules.find(([pattern]) => pattern.test(normalized))?.[1] || ListChecks;
 }
 const matters = realms.flatMap((realm) =>
   realm.directions.map((title, index) => ({
@@ -469,7 +488,7 @@ function RealmCard({ realm, index, openModal, matters }) {
 }
 function MatterCard({ item, index, openModal, tasks }) {
   const realm = realms.find((r) => r.name === item.realm),
-    Icon = item.Icon,
+    Icon = iconForMatterName(item.title),
     todoCount = tasks.filter(
       (task) => task.tag === item.title && !task.done,
     ).length;
@@ -586,13 +605,12 @@ function ScheduleTodoPanel({
   openModal,
 }) {
   const [sortMode, setSortMode] = useState("manual"),
-    [sortOpen, setSortOpen] = useState(false),
     [completing, setCompleting] = useState([]),
     [deleting, setDeleting] = useState([]),
     sortLabels = {
-      manual: "手动排序",
+      manual: "手动",
       time: "按时间",
-      realm: "按板块",
+      realm: "按版图",
       status: "按状态",
     },
     active = tasks.filter(
@@ -771,34 +789,7 @@ function ScheduleTodoPanel({
       </div>
       <div className="todo-sub">
         <span>正在推进</span>
-        <div className="todo-sort-wrap">
-          <button
-            className="todo-sort-trigger"
-            onClick={() => setSortOpen((v) => !v)}
-            aria-expanded={sortOpen}
-          >
-            <Settings2 />
-            <span>{sortLabels[sortMode]}</span>
-            <ChevronDown />
-          </button>
-          {sortOpen && (
-            <div className="todo-sort-menu">
-              {Object.entries(sortLabels).map(([value, label]) => (
-                <button
-                  className={sortMode === value ? "active" : ""}
-                  onClick={() => {
-                    setSortMode(value);
-                    setSortOpen(false);
-                  }}
-                  key={value}
-                >
-                  <span>{label}</span>
-                  {sortMode === value && <Check />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <TodoSortControl mode={sortMode} setMode={setSortMode} labels={sortLabels} />
       </div>
       <div className="dashboard-task-scroll grouped-task-scroll">
         <Cards items={progress} />
@@ -1163,6 +1154,42 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
           navigate={navigate}
           openModal={openModal}
         />
+      )}
+    </div>
+  );
+}
+
+function TodoSortControl({ mode, setMode, labels, className = "" }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`todo-sort-wrap ${className}`.trim()}>
+      <button
+        className="todo-sort-trigger"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="选择待办排序方式"
+        aria-expanded={open}
+      >
+        <span>{labels[mode]}</span>
+        <ChevronDown />
+      </button>
+      {open && (
+        <div className="todo-sort-menu">
+          {Object.entries(labels).map(([value, label]) => (
+            <button
+              className={mode === value ? "active" : ""}
+              type="button"
+              onClick={() => {
+                setMode(value);
+                setOpen(false);
+              }}
+              key={value}
+            >
+              <span>{label}</span>
+              {mode === value && <Check />}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );
@@ -1665,10 +1692,22 @@ function MattersPage({ navigate, openModal, tasks = [] }) {
   );
 }
 function TodoPage({ navigate, openModal, tasks, setTasks }) {
-  const todayKey = new Date().toLocaleDateString("en-CA"),
-    visibleTasks = tasks.filter(
+  const [sortMode, setSortMode] = useState("time"),
+    sortLabels = { time: "按时间", realm: "按版图", status: "按状态" },
+    todayKey = new Date().toLocaleDateString("en-CA"),
+    rawVisibleTasks = tasks.filter(
       (t) => !t.archived && Boolean(t.date) && taskOccursOnDate(t, todayKey),
     ),
+    taskClock = (task) =>
+      task.clock || `${task.meta || ""} ${task.time || ""}`.match(/\d{1,2}:\d{2}/)?.[0] || "99:99",
+    visibleTasks = [...rawVisibleTasks].sort((a, b) => {
+      if (sortMode === "realm")
+        return realms.findIndex((realm) => realm.name === realmForTask(a).name) -
+          realms.findIndex((realm) => realm.name === realmForTask(b).name);
+      if (sortMode === "status")
+        return Number(a.done) - Number(b.done) || Number(b.level === "late") - Number(a.level === "late");
+      return taskClock(a).localeCompare(taskClock(b), "zh-CN", { numeric: true });
+    }),
     arrangedTasks = visibleTasks.filter(
       (t) => !t.done && /\d{1,2}:\d{2}/.test(`${t.meta || ""} ${t.time || ""}`),
     );
@@ -1714,9 +1753,12 @@ function TodoPage({ navigate, openModal, tasks, setTasks }) {
           title="今日概览"
           sub={todayKey}
           action={
-            <button className="sort">
-              按时间排序 <ChevronDown />
-            </button>
+            <TodoSortControl
+              mode={sortMode}
+              setMode={setSortMode}
+              labels={sortLabels}
+              className="todo-page-sort"
+            />
           }
         >
           <div className="stats">
@@ -2570,7 +2612,9 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
     [statuses, setStatuses] = useState(() =>
       realm.directions.map(
         (title, i) =>
-          matters.find((item) => item.title === title)?.state ||
+          matters.find(
+            (item) => item.title === title && item.realm === realm.name,
+          )?.state ||
           directionStates[i % 4],
       ),
     ),
@@ -2590,6 +2634,29 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
     [titleDraft, setTitleDraft] = useState(""),
     [editingTodoId, setEditingTodoId] = useState(null),
     [draggedIndex, setDraggedIndex] = useState(null);
+  const realmDirectionSignature = realm.directions.join("\u0001");
+  useEffect(() => {
+    const nextDirections = [...realm.directions];
+    setDirections(nextDirections);
+    setStatuses(
+      nextDirections.map(
+        (title, index) =>
+          matters.find(
+            (item) => item.title === title && item.realm === realm.name,
+          )?.state || directionStates[index % directionStates.length],
+      ),
+    );
+    setDirectionNotes((current) =>
+      nextDirections.map(
+        (title, index) =>
+          matters.find(
+            (item) => item.title === title && item.realm === realm.name,
+          )?.note ||
+          current[directions.indexOf(title)] ||
+          `${title}承接这一事项里持续发生的内容、经验与具体行动。`,
+      ),
+    );
+  }, [realmDirectionSignature, realm.name]);
   const add = () => {
     if (draft.trim()) {
       const title = draft.trim();
@@ -2707,7 +2774,10 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
     const item = matters.find(
       (entry) => entry.title === oldTitle && entry.realm === realm.name,
     );
-    if (item) item.title = nextTitle;
+    if (item) {
+      item.title = nextTitle;
+      item.Icon = iconForMatterName(nextTitle);
+    }
     setTasks((current) =>
       current.map((task) =>
         task.tag === oldTitle ? { ...task, tag: nextTitle } : task,
@@ -2734,6 +2804,9 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
         style={{ "--c": realm.color, "--t": realm.tint }}
         onClick={(e) => e.stopPropagation()}
       >
+        <button className="realm-mobile-back" onClick={close} aria-label="返回">
+          <ChevronLeft />
+        </button>
         <button className="modal-close" onClick={close}>
           <X />
         </button>
@@ -2834,11 +2907,12 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
             {directions.map((d, i) => {
               const linkedMatter = matters.find((item) => item.title === d && item.realm === realm.name);
               if (linkedMatter?.archived) return null;
-              const DIcon = iconForMatterName(d),
-                StatusIcon = statusIcons[statusOptions.indexOf(statuses[i])];
+              const status = statuses[i] || linkedMatter?.state || "储备",
+                statusIndex = Math.max(0, statusOptions.indexOf(status)),
+                DIcon = iconForMatterName(d);
               return (
                 <article
-                  className={`${selectedIndex === i ? "is-expanded" : ""} ${statuses[i] === "结束" ? "is-ended" : ""}`}
+                  className={`${selectedIndex === i ? "is-expanded" : ""} ${status === "结束" ? "is-ended" : ""}`}
                   draggable={editingTitle?.index !== i}
                   onDragStart={(e) => {
                     setDraggedIndex(i);
@@ -2858,14 +2932,14 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
                   key={`${d}-${i}`}
                 >
                   <button
-                    className={`direction-profile-state status-${statusOptions.indexOf(statuses[i])}`}
+                    className={`direction-profile-state status-${statusIndex}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       cycleStatus(i);
                     }}
                   >
-                    <StatusIcon aria-hidden="true" />
-                    {statuses[i]}
+                    <i aria-hidden="true" />
+                    <span>{status}</span>
                   </button>
                   <div className="direction-profile-icon">
                     <DIcon />
@@ -2903,13 +2977,18 @@ function RealmModal({ realm, close, tasks, setTasks, onDataChange }) {
                       <h4>{d}</h4>
                     </button>
                   )}
-                  <span>{realm.note}</span>
+                  <span
+                    className="direction-profile-realm"
+                    data-mobile-label={realm.name}
+                  >
+                    {realm.note}
+                  </span>
                   <footer>
                     <small>
                       最近更新 · {["今天", "2天前", "5天前", "1周前"][i % 4]}
                     </small>
                   </footer>
-                  {statuses[i] === "结束" && (
+                  {status === "结束" && (
                     <button className="direction-archive-action" onClick={(e) => { e.stopPropagation(); archiveDirection(i); }} aria-label={`归档${d}`}>
                       <Archive /> 归档
                     </button>
@@ -4449,7 +4528,7 @@ function ContentDetailModal({
     [titleDraft, setTitleDraft] = useState(item.title),
     [draggedTaskId, setDraggedTaskId] = useState(null);
   const realm = realms.find((r) => r.name === item.realm),
-    Icon = item.Icon,
+    Icon = iconForMatterName(item.title),
     linkedTasks = tasks.filter((task) => task.tag === item.title),
     currentTasks = linkedTasks.filter((task) => !task.done),
     activeTasks = currentTasks.filter((task) => task.matterStatus !== "待安排"),
@@ -4473,6 +4552,7 @@ function ContentDetailModal({
     }
     const oldTitle = item.title;
     item.title = nextTitle;
+    item.Icon = iconForMatterName(nextTitle);
     if (realm) {
       realm.directions = realm.directions.map((title) =>
         title === oldTitle ? nextTitle : title,
