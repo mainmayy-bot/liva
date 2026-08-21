@@ -465,6 +465,17 @@ function taskClockValue(task) {
   return `${task.clock || ""} ${task.meta || ""} ${task.time || ""}`.match(/\d{1,2}:\d{2}/)?.[0] || "";
 }
 
+function taskMinuteValue(task) {
+  const clock = taskClockValue(task);
+  if (!clock) return null;
+  const [hour, minute] = clock.split(":").map(Number);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59)
+    return null;
+  return hour * 60 + minute;
+}
+
+let livaDraggedTask = null;
+
 function taskIsOverdueOnDate(task, dateKey, now = new Date()) {
   if (taskCompletedOnDate(task, dateKey)) return false;
   const todayKey = localDateKey(now);
@@ -808,7 +819,7 @@ function ScheduleTodoPanel({
               completedDates: [...new Set([...(item.completedDates || []), selectedDateKey])],
             };
           }
-          return { ...item, done: true, matterStatus: "已结束", completedAt: new Date().toISOString() };
+          return { ...item, done: true, matterStatus: "已完成", completedAt: new Date().toISOString() };
         }));
         setCompleting((v) => v.filter((item) => item !== id));
       }, 360);
@@ -842,9 +853,12 @@ function ScheduleTodoPanel({
             }}
             draggable={!isCompleting && !mobileTimeline}
             onDragStart={(e) => {
+              livaDraggedTask = t;
               e.dataTransfer.effectAllowed = "move";
               e.dataTransfer.setData("text/plain", JSON.stringify(t));
+              e.dataTransfer.setData("application/x-liva-task", String(t.id));
             }}
+            onDragEnd={() => { livaDraggedTask = null; }}
             onDragOver={(e) => {
               if (sortMode === "manual") e.preventDefault();
             }}
@@ -864,7 +878,21 @@ function ScheduleTodoPanel({
             }}
             key={t.id}
           >
-            <button className="drag" type="button" aria-label={`拖动调整${t.title}顺序`} {...bindTaskTouch(t.id)}><GripVertical /></button>
+            <button
+              className="drag"
+              type="button"
+              draggable={!isCompleting && !mobileTimeline}
+              onDragStart={(e) => {
+                e.stopPropagation();
+                livaDraggedTask = t;
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", JSON.stringify(t));
+                e.dataTransfer.setData("application/x-liva-task", String(t.id));
+              }}
+              onDragEnd={() => { livaDraggedTask = null; }}
+              aria-label={`拖动调整${t.title}顺序`}
+              {...bindTaskTouch(t.id)}
+            ><GripVertical /></button>
             <button
               className="task-check"
               onClick={() => completeTask(t.id)}
@@ -1010,20 +1038,6 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
     hours = Array.from({ length: 24 }, (_, i) => i),
     scroller = useRef(null),
     datePicker = useRef(null),
-    [scheduled, setScheduled] = useState(() =>
-      tasks
-        .filter((t) => t.date && t.clock && !t.done && !t.archived)
-        .map((t) => ({
-          id: t.id,
-          taskId: t.id,
-          title: t.title,
-          start:
-            Number(t.clock.split(":")[0]) +
-            Number(t.clock.split(":")[1] || 0) / 60,
-          duration: t.durationHours || 1,
-          dateKey: t.date,
-        })),
-    ),
     [now, setNow] = useState(() => new Date()),
     [selectedDate, setSelectedDate] = useState(() => new Date());
   const dateKey = (d) => d.toLocaleDateString("en-CA"),
@@ -1035,6 +1049,23 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
     nowLabel = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
     dateLabel = `${selectedDate.getMonth() + 1}月${selectedDate.getDate()}日`,
     axisTitle = isToday ? "今日时间轴" : `${dateLabel}时间轴`;
+  const scheduled = tasks
+    .filter((task) => {
+      if (task.done || task.archived || taskMinuteValue(task) === null) return false;
+      if (!task.date) return selectedKey === todayKey;
+      return taskOccursOnDate(task, selectedKey);
+    })
+    .map((task) => {
+      const minutes = taskMinuteValue(task);
+      return {
+        id: `${task.id}-${selectedKey}`,
+        taskId: task.id,
+        title: task.title,
+        start: minutes / 60,
+        duration: Math.max(0.5, Math.min(24 - minutes / 60, Number(task.durationHours) || 1)),
+        dateKey: selectedKey,
+      };
+    });
   const focusNow = () =>
     requestAnimationFrame(() => {
       if (scroller.current)
@@ -1043,49 +1074,6 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
           behavior: "smooth",
         });
     });
-  useEffect(() => {
-    setScheduled((current) => {
-        const active = current.filter((s) =>
-        tasks.some(
-          (t) => t.id === s.taskId && t.date && t.clock && !t.done && !t.archived,
-        ),
-      ),
-        timed = tasks.filter(
-          (t) =>
-            t.date &&
-            t.clock &&
-            !t.done &&
-            !t.archived &&
-            taskOccursOnDate(t, selectedKey),
-        );
-      return [
-        ...active.filter((s) => !timed.some((t) => t.id === s.taskId)),
-        ...timed.map((t) => {
-          const existing = active.find((s) => s.taskId === t.id);
-          return existing
-            ? {
-                ...existing,
-                title: t.title,
-                dateKey: selectedKey,
-                start:
-                  Number(t.clock.split(":")[0]) +
-                  Number(t.clock.split(":")[1] || 0) / 60,
-                duration: t.durationHours || existing.duration,
-              }
-            : {
-                id: t.id,
-                taskId: t.id,
-                title: t.title,
-                start:
-                  Number(t.clock.split(":")[0]) +
-                  Number(t.clock.split(":")[1] || 0) / 60,
-                duration: t.durationHours || 1,
-                dateKey: selectedKey,
-              };
-        }),
-      ];
-    });
-  }, [tasks]);
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 60000);
     focusNow();
@@ -1112,26 +1100,9 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
     drop = (e, hour) => {
       e.preventDefault();
       try {
-        const t = JSON.parse(e.dataTransfer.getData("text/plain"));
-        setScheduled((v) =>
-          v.some((s) => s.taskId === t.id)
-            ? v.map((s) =>
-                s.taskId === t.id
-                  ? { ...s, start: hour, dateKey: selectedKey }
-                  : s,
-              )
-            : [
-                ...v,
-                {
-                  id: Date.now(),
-                  taskId: t.id,
-                  title: t.title,
-                  start: hour,
-                  duration: 1,
-                  dateKey: selectedKey,
-                },
-              ],
-        );
+        const transferred = e.dataTransfer.getData("text/plain"),
+          t = transferred ? JSON.parse(transferred) : livaDraggedTask;
+        if (!t?.id) return;
         const clock = formatTimelineClock(hour);
         setTasks((current) =>
           current.map((item) =>
@@ -1145,28 +1116,21 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
               : item,
           ),
         );
-      } catch {}
+        livaDraggedTask = null;
+      } catch {
+        livaDraggedTask = null;
+      }
     };
   const resize = (e, id) => {
     e.preventDefault();
     e.stopPropagation();
     const startY = e.clientY,
       current = scheduled.find((s) => s.id === id);
+    if (!current) return;
     const move = (ev) => {
       const change = Math.round((ev.clientY - startY) / (slotHeight / 2)) / 2;
-      setScheduled((v) =>
-        v.map((s) =>
-          s.id === id
-            ? {
-                ...s,
-                duration: Math.max(
-                  0.5,
-                  Math.min(24 - s.start, current.duration + change),
-                ),
-              }
-            : s,
-        ),
-      );
+      const duration = Math.max(0.5, Math.min(24 - current.start, current.duration + change));
+      setTasks((items) => items.map((task) => task.id === current.taskId ? { ...task, durationHours: duration } : task));
     };
     const up = () => {
       document.removeEventListener("mousemove", move);
@@ -1225,6 +1189,10 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
         <div className="axis-scroll" ref={scroller}>
           <div
             className="axis-grid"
+            style={{
+              "--timeline-slot-height": `${slotHeight}px`,
+              minHeight: `${hours.length * slotHeight}px`,
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
@@ -1269,8 +1237,9 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
                   data-start={s.start}
                   data-realm={tone.name}
                   style={{
-                    top: s.start * slotHeight + 2,
-                    height: s.duration * slotHeight - 4,
+                    position: "absolute",
+                    top: `${s.start * slotHeight + 2}px`,
+                    height: `${Math.max(24, s.duration * slotHeight - 4)}px`,
                     "--schedule-color": tone.color,
                     "--schedule-tint": tone.tint,
                     left: `calc(48px + ${laneLeft}% - ${(laneLeft * 52) / 100}px)`,
@@ -1281,9 +1250,11 @@ function PlanningBoard({ tasks, setTasks, navigate, openModal, timelineOnly = fa
                   onDragStart={(e) => {
                     const task = tasks.find((item) => item.id === s.taskId);
                     if (!task) return;
+                    livaDraggedTask = task;
                     e.dataTransfer.effectAllowed = "move";
                     e.dataTransfer.setData("text/plain", JSON.stringify(task));
                   }}
+                  onDragEnd={() => { livaDraggedTask = null; }}
                   key={s.id}
                 >
                   <b>{s.title}</b>
@@ -4201,6 +4172,12 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
   const [draft, setDraft] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [assistantMemory, setAssistantMemory] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("liva-assistant-memory"));
+      return Array.isArray(saved) ? saved.slice(-30) : [];
+    } catch { return []; }
+  });
   const streamRef = useRef(null);
   const [messages, setMessages] = useState(() => {
     try {
@@ -4296,12 +4273,28 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
             realms: realms.map((realm) => ({ name: realm.name, note: getRealmNote(realm), directions: realm.directions })),
             matters: matters.filter((matter) => !matter.archived).map(({ title, realm, state, kind, note }) => ({ title, realm, state, kind, note })),
             inspirationMemos: inspirationMemos.map(({ text: memoText, time, done }) => ({ text: memoText, time, done })),
+            assistantMemory,
           },
         }),
       }), new Promise((resolve) => window.setTimeout(resolve, 680))]);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI 服务暂时不可用");
-      if (result.action) setPending(result.action);
+      if (Array.isArray(result.memoryUpdates) && result.memoryUpdates.length) {
+        setAssistantMemory((current) => {
+          const next = [...current];
+          result.memoryUpdates.forEach((memory) => {
+            const normalized = String(memory || "").trim();
+            if (normalized && !next.includes(normalized)) next.push(normalized);
+          });
+          const trimmed = next.slice(-30);
+          localStorage.setItem("liva-assistant-memory", JSON.stringify(trimmed));
+          return trimmed;
+        });
+      }
+      const actions = Array.isArray(result.actions)
+        ? result.actions.filter(Boolean)
+        : result.action ? [result.action] : [];
+      if (actions.length) setPending(actions.length === 1 ? actions[0] : { type: "batch", actions });
       setMessages((value) => [...value, {
         role: "assistant",
         kind: result.reply.includes("\n") ? "report" : undefined,
@@ -4320,21 +4313,46 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
 
   const confirmCreate = () => {
     if (!pending) return;
-    const actionType = pending.type === "create" ? "create_task" : pending.type;
-    if (actionType === "create_task") {
-      setTasks((value) => [...value, { id: Date.now(), title: pending.title, tag: pending.tag || "临时待办事项", realm: "Admin", date: pending.date || localDateKey(), time: pending.time || "今天", repeat: pending.repeat || undefined, level: "normal", done: false }]);
-    } else if (actionType === "update_task") {
-      setTasks((value) => value.map((task) => task.id === pending.taskId ? { ...task, ...(pending.title ? { title: pending.title } : {}), ...(pending.date ? { date: pending.date } : {}), ...(pending.time ? { time: pending.time } : {}), ...(pending.repeat ? { repeat: pending.repeat } : {}), ...(pending.tag ? { tag: pending.tag } : {}) } : task));
-    } else if (actionType === "complete_task") {
-      setTasks((value) => value.map((task) => task.id === pending.taskId ? { ...task, done: true } : task));
-    } else if (actionType === "delete_task") {
-      setTasks((value) => value.filter((task) => task.id !== pending.taskId));
-    }
-    const actionLabel = { create_task: "添加", update_task: "更新", complete_task: "完成", delete_task: "删除" }[actionType] || "处理";
-    const targetTitle = pending.title || tasks.find((task) => task.id === pending.taskId)?.title || "这件事项";
+    const actions = pending.type === "batch" ? pending.actions : [pending];
+    setTasks((value) => actions.reduce((current, rawAction, index) => {
+      const action = { ...rawAction, type: rawAction.type === "create" ? "create_task" : rawAction.type },
+        normalizedStatus = action.status === "未开始" || action.status === "待安排" ? "待安排" : "进行中";
+      if (action.type === "create_task") {
+        const linkedMatter = matters.find((matter) => matter.title === action.tag);
+        return [...current, {
+          id: Date.now() + index,
+          title: action.title,
+          tag: action.tag || "临时待办事项",
+          realm: linkedMatter?.realm || "Admin",
+          date: action.date || localDateKey(),
+          time: action.time || "随时待办",
+          clock: /^\d{1,2}:\d{2}$/.test(action.time || "") ? action.time : "",
+          repeat: action.repeat || undefined,
+          matterStatus: normalizedStatus,
+          level: "normal",
+          done: false,
+        }];
+      }
+      if (action.type === "update_task") return current.map((task) => task.id === action.taskId ? {
+        ...task,
+        ...(action.title ? { title: action.title } : {}),
+        ...(action.date ? { date: action.date } : {}),
+        ...(action.time ? { time: action.time } : {}),
+        ...(action.time && /^\d{1,2}:\d{2}$/.test(action.time) ? { clock: action.time } : {}),
+        ...(action.repeat ? { repeat: action.repeat } : {}),
+        ...(action.tag ? { tag: action.tag } : {}),
+        ...(action.status ? { matterStatus: normalizedStatus } : {}),
+      } : task);
+      if (action.type === "complete_task") return current.map((task) => task.id === action.taskId ? { ...task, done: true } : task);
+      if (action.type === "delete_task") return current.filter((task) => task.id !== action.taskId);
+      return current;
+    }, value));
+    const actionLabel = actions.length > 1 ? `批量处理 ${actions.length} 条待办` : ({ create_task: "添加", update_task: "更新", complete_task: "完成", delete_task: "删除" }[actions[0]?.type] || "处理");
+    const targetTitle = actions.length > 1 ? "" : actions[0]?.title || tasks.find((task) => task.id === actions[0]?.taskId)?.title || "这件事项";
     setMessages((value) => [...value, {
       role: "assistant",
-      text: `完成，已经${actionLabel}「${targetTitle}」。微光把它放进了你的生活星轨，会继续替你留意。`,
+      text: actions.length > 1 ? `完成，已经${actionLabel}。每一条的状态也按你的要求保存好了。` : `完成，已经${actionLabel}「${targetTitle}」。微光会继续替你留意。`,
+      arriving: true,
     }]);
     setPending(null);
   };
@@ -4369,11 +4387,18 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
             {isThinking && <div className="assistant-message assistant thinking"><span><Sparkles /></span><div className="assistant-message-stack"><small className="assistant-message-author">微光</small><div className="assistant-bubble">微光正在梳理你的想法…</div></div></div>}
             {pending && (
               <article className="assistant-action-preview">
-                <header><ListChecks /><div><b>微光准备调整星轨</b><small>确认后才会写入 Liva</small></div></header>
-                <div><span>操作</span><strong>{{ create_task: "新建待办", update_task: "修改待办", complete_task: "完成待办", delete_task: "删除待办", create: "新建待办" }[pending.type] || "调整事项"}</strong></div>
-                <div><span>事项</span><strong>{pending.title || tasks.find((task) => task.id === pending.taskId)?.title || "待确认事项"}</strong></div>
-                {(pending.date || pending.time || pending.repeat || pending.scheduleLabel) && <div><span>时间</span><strong>{pending.scheduleLabel || [pending.date, pending.time, repeatLabel(pending.repeat)].filter(Boolean).join(" · ")}</strong></div>}
-                {pending.tag && <div><span>归属</span><strong>{pending.tag}</strong></div>}
+                <header><ListChecks /><div><b>{pending.type === "batch" ? `微光准备处理 ${pending.actions.length} 条待办` : "微光准备调整星轨"}</b><small>确认后才会写入 Liva</small></div></header>
+                {pending.type === "batch" ? (
+                  <div className="assistant-batch-actions">
+                    {pending.actions.map((action, index) => <div key={`${action.title}-${index}`}><b>{index + 1}</b><span>{action.title || "待确认事项"}</span><small>{action.status || "待安排"}</small></div>)}
+                  </div>
+                ) : <>
+                  <div><span>操作</span><strong>{{ create_task: "新建待办", update_task: "修改待办", complete_task: "完成待办", delete_task: "删除待办", create: "新建待办" }[pending.type] || "调整事项"}</strong></div>
+                  <div><span>事项</span><strong>{pending.title || tasks.find((task) => task.id === pending.taskId)?.title || "待确认事项"}</strong></div>
+                  {(pending.date || pending.time || pending.repeat || pending.scheduleLabel) && <div><span>时间</span><strong>{pending.scheduleLabel || [pending.date, pending.time, repeatLabel(pending.repeat)].filter(Boolean).join(" · ")}</strong></div>}
+                  {pending.tag && <div><span>归属</span><strong>{pending.tag}</strong></div>}
+                  {pending.status && <div><span>状态</span><strong>{pending.status}</strong></div>}
+                </>}
                 <footer><button onClick={() => setPending(null)}>暂不执行</button><button onClick={confirmCreate}><Check /> 确认执行</button></footer>
               </article>
             )}
@@ -5166,8 +5191,9 @@ function DeleteConfirmModal({ kind, index, close, onDeleted, setTasks }) {
   );
 }
 function MatterTaskCard({ task, setTasks, openModal, compact = false }) {
-  const states = ["进行中", "待安排", "已结束"],
-    status = task.done ? "已结束" : task.matterStatus || "进行中",
+  const states = ["待安排", "进行中", "已完成"],
+    storedStatus = task.matterStatus === "已结束" ? "已完成" : task.matterStatus,
+    status = task.done ? "已完成" : storedStatus || "进行中",
     statusClass =
       status === "进行中"
         ? "ongoing"

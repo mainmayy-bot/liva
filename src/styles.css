@@ -170,6 +170,7 @@
   font-size:10px;
   line-height:1;
 }
+
 .refined-realm-modal .realm-modal-title>button svg{width:12px;height:12px}
 .content-detail-modal .detail-heading>button{
   height:32px;
@@ -1519,4 +1520,15 @@ html.is-scrolling::-webkit-scrollbar-thumb,body.is-scrolling::-webkit-scrollbar-
   .refined-realm-modal .direction-profile-grid>article.is-ended{background:#f4f5f4!important;border-color:#dfe3e1!important;opacity:.82}
   .refined-realm-modal .direction-profile-grid>article.is-ended footer{margin-right:70px!important}
   .refined-realm-modal .direction-archive-action{right:13px;bottom:12px;padding:5px 8px;font-size:9px}
+}
+
+/* Final timeline scale contract: rendering and drag/drop use the same pixels per hour. */
+.axis-grid{min-height:calc(24 * var(--timeline-slot-height,64px))!important}
+.axis-grid .hour-row{height:var(--timeline-slot-height,64px)!important}
+.axis-grid .hour-row time{color:#7f8985!important;font-variant-numeric:tabular-nums}
+.axis-grid .hour-row i{background:#dfe5e2!important}
+.axis-grid .scheduled-block{transform:none!important}
+@media(max-width:800px){
+  .axis-grid{min-height:calc(24 * var(--timeline-slot-height,48px))!important}
+  .axis-grid .hour-row{height:var(--timeline-slot-height,48px)!important}
 }

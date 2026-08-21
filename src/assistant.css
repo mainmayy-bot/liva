@@ -239,3 +239,10 @@
   .assistant-composer{margin:0 12px 0}
   .assistant-note{margin:4px 0 2px;font-size:7px;line-height:1.35}
 }
+
+.assistant-action-preview .assistant-batch-actions{display:grid;grid-template-columns:1fr;max-height:260px;overflow-y:auto;border-top:1px solid #edf1ef;padding:5px 3px 3px}
+.assistant-action-preview .assistant-batch-actions>div{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:8px;border:0;border-bottom:1px solid #f0f3f1;padding:8px 0}
+.assistant-action-preview .assistant-batch-actions>div:last-child{border-bottom:0}
+.assistant-action-preview .assistant-batch-actions b{display:grid;width:18px;height:18px;place-items:center;border-radius:6px;background:#eef4f0;color:#6d8f7a;font-size:8px}
+.assistant-action-preview .assistant-batch-actions span{overflow:hidden;color:#424e48;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.assistant-action-preview .assistant-batch-actions small{color:#84908a;font-size:8px}
