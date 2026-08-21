@@ -1,4 +1,5 @@
-const MODEL = process.env.OPENAI_MODEL || "gpt-5.4";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.4";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 const actionSchema = {
   type: "object",
@@ -33,10 +34,106 @@ function getOutputText(response) {
   return response.output?.flatMap((item) => item.content || []).find((item) => item.type === "output_text")?.text || "";
 }
 
+function getGeminiOutputText(response) {
+  return response.candidates?.[0]?.content?.parts
+    ?.map((part) => part.text || "")
+    .join("")
+    .trim() || "";
+}
+
+function parseStructuredOutput(text, provider) {
+  if (!text) throw new Error(`${provider} 没有返回可解析的内容`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    const json = text.match(/\{[\s\S]*\}/)?.[0];
+    if (!json) throw new Error(`${provider} 返回的内容不是有效 JSON`);
+    return JSON.parse(json);
+  }
+}
+
+async function requestOpenAI({ instructions, input }) {
+  const apiResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      instructions,
+      input,
+      text: { format: { type: "json_schema", name: "liva_assistant_response", strict: true, schema: responseSchema } },
+    }),
+  });
+  const response = await apiResponse.json();
+  if (!apiResponse.ok) throw new Error(response.error?.message || "OpenAI request failed");
+  return parseStructuredOutput(getOutputText(response), "OpenAI");
+}
+
+async function requestGemini({ instructions, input }) {
+  const contents = input.map(({ role, content }) => ({
+    role: role === "assistant" ? "model" : "user",
+    parts: [{ text: content }],
+  }));
+  const apiResponse = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": process.env.GEMINI_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: instructions }] },
+        contents,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema,
+          temperature: 0.25,
+        },
+      }),
+    },
+  );
+  const response = await apiResponse.json();
+  if (!apiResponse.ok) throw new Error(response.error?.message || "Gemini request failed");
+  return parseStructuredOutput(getGeminiOutputText(response), "Gemini");
+}
+
+function getProviderOrder() {
+  const preferred = String(process.env.AI_PROVIDER || "auto").toLowerCase();
+  const available = [];
+  if (process.env.GEMINI_API_KEY) available.push("gemini");
+  if (process.env.OPENAI_API_KEY) available.push("openai");
+  if (preferred === "gemini" || preferred === "openai") {
+    return [preferred, ...available.filter((provider) => provider !== preferred)].filter(
+      (provider, index, providers) => available.includes(provider) && providers.indexOf(provider) === index,
+    );
+  }
+  return available;
+}
+
+async function requestAssistant(payload) {
+  const providers = getProviderOrder();
+  if (!providers.length) {
+    throw new Error("请配置 GEMINI_API_KEY 或 OPENAI_API_KEY");
+  }
+  const errors = [];
+  for (const provider of providers) {
+    try {
+      return await (provider === "gemini" ? requestGemini(payload) : requestOpenAI(payload));
+    } catch (error) {
+      console.error(`Liva ${provider} provider error:`, error);
+      errors.push(`${provider}: ${error.message}`);
+    }
+  }
+  throw new Error(errors.join("；"));
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!process.env.OPENAI_API_KEY) {
-    return res.status(503).json({ error: "Liva 还没有配置 OPENAI_API_KEY，微光暂时无法连接真正的 AI。" });
+  if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: "Liva 还没有配置 AI 密钥，请添加 GEMINI_API_KEY 或 OPENAI_API_KEY。" });
   }
   try {
     const { message, history = [], context = {} } = req.body || {};
@@ -71,22 +168,7 @@ export default async function handler(req, res) {
       ...recentHistory,
       { role: "user", content: `以下是当前 Liva 数据快照：\n${JSON.stringify(context)}\n\n用户刚刚说：${message}` },
     ];
-    const apiResponse = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        instructions,
-        input,
-        text: { format: { type: "json_schema", name: "liva_assistant_response", strict: true, schema: responseSchema } },
-      }),
-    });
-    const response = await apiResponse.json();
-    if (!apiResponse.ok) throw new Error(response.error?.message || "OpenAI request failed");
-    const output = JSON.parse(getOutputText(response));
+    const output = await requestAssistant({ instructions, input });
     return res.status(200).json(output);
   } catch (error) {
     console.error("Liva assistant error:", error);
