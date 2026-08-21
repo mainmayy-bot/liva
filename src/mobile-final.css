@@ -1,0 +1,135 @@
+/* Final mobile contracts live here so legacy responsive rules cannot override them. */
+
+/* Semantic drag buttons must not inherit the browser's default button surface. */
+.schedule-todos .tasks button.drag {
+  display:grid;
+  width:14px;
+  min-width:14px;
+  height:28px;
+  place-items:center;
+  margin:0;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  color:#a8b1ad;
+  box-shadow:none;
+  appearance:none;
+  cursor:grab;
+}
+.schedule-todos .tasks button.drag:active { cursor:grabbing; }
+.schedule-todos .tasks button.drag svg { width:12px;height:12px; }
+
+/* Shared insertion marker for mouse and touch reordering. */
+[data-touch-order], [draggable="true"] { position:relative; }
+.is-drop-target[data-drop-edge]::before {
+  position:absolute;
+  z-index:60;
+  right:8px;
+  left:8px;
+  height:1px;
+  border-radius:0;
+  background:#bfc7c3;
+  box-shadow:none;
+  pointer-events:none;
+  content:"";
+}
+.is-drop-target[data-drop-edge="before"]::before { top:-4px;bottom:auto; }
+.is-drop-target[data-drop-edge="after"]::before { top:auto;bottom:-4px; }
+
+@media (max-width: 800px) {
+  .assistant-page { height:calc(100dvh - 70px) !important; }
+  .assistant-message.assistant p { font-size:10px !important;line-height:1.68 !important; }
+  .assistant-message.user p { font-size:11px !important; }
+  .assistant-composer { margin:0 12px !important; }
+  .assistant-note { margin:7px 0 8px !important;font-size:8px !important;line-height:1.5 !important; }
+  .todo-page-shell.mobile-todo-timeline-page .schedule-todos > .stats {
+    gap: 6px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .todo-page-shell.mobile-todo-timeline-page .schedule-todos > .stats > div {
+    min-height: 0 !important;
+    height: 54px !important;
+    border-radius: 11px !important;
+    padding: 6px 4px !important;
+    box-shadow: none !important;
+  }
+
+  .todo-page-shell.mobile-todo-timeline-page .schedule-todos > .stats b {
+    font-size: 16px !important;
+    line-height: 1 !important;
+  }
+
+  .todo-page-shell.mobile-todo-timeline-page .schedule-todos > .stats span::after {
+    font-size: 8px !important;
+  }
+  .todo-page-shell.mobile-todo-timeline-page .schedule-todos > .stats span {
+    font-size: 0 !important;
+  }
+
+  body.mobile-reordering { overflow: hidden; touch-action: none; }
+  body.mobile-reordering [data-touch-order] { transition: transform .18s cubic-bezier(.2,.8,.2,1),opacity .18s,box-shadow .18s !important; }
+  [data-touch-order].is-touch-dragging { z-index:30 !important;opacity:.76 !important;transform:scale(1.025) !important;box-shadow:0 16px 34px rgba(48,66,56,.18) !important; }
+  [data-touch-order].is-drop-target[data-drop-edge="before"]::before { top:-4px !important;bottom:auto !important; }
+  [data-touch-order].is-drop-target[data-drop-edge="after"]::before { top:auto !important;bottom:-4px !important; }
+  .mobile-reorder-handle { display:none !important; }
+  #life-content .draggable-matter-card { touch-action:pan-y; }
+  #life-map .draggable-board-card { touch-action:pan-y; }
+  .tasks .drag,.memo-drag-handle { width:28px !important;height:34px !important;min-width:28px !important;display:grid !important;place-items:center !important;border:0 !important;border-radius:9px !important;background:transparent !important;color:#71907f !important;box-shadow:none !important;touch-action:none; }
+  .tasks .drag { padding:7px !important; }
+  .tasks .drag svg { width:14px !important;height:14px !important; }
+  .todo-page-shell.mobile-todo-timeline-page .task-copy { min-width:0 !important; }
+  .todo-page-shell.mobile-todo-timeline-page .task-title-line {
+    display:flex !important;
+    width:100% !important;
+    max-width:100% !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+    gap:4px !important;
+    overflow:visible !important;
+  }
+  .todo-page-shell.mobile-todo-timeline-page .task-title-line b {
+    flex:0 1 auto !important;
+    width:auto !important;
+    min-width:0 !important;
+  }
+  .todo-page-shell.mobile-todo-timeline-page .task-title-line em {
+    display:inline-flex !important;
+    flex:0 0 auto !important;
+    margin:0 !important;
+    color:#dc6d64 !important;
+    font-size:8px !important;
+    line-height:1 !important;
+    white-space:nowrap !important;
+  }
+  .memo-drag-handle svg { width:14px;height:14px; }
+  .inspiration-list article { position:relative;grid-template-columns:28px 22px minmax(0,1fr) auto !important;align-items:center !important; }
+
+  body .realm-backdrop > section.refined-realm-modal { width:min(calc(100% - 28px),410px) !important;height:min(82dvh,700px) !important;max-height:min(82dvh,700px) !important;border-radius:24px !important; }
+  body .realm-backdrop section.refined-realm-modal > header { grid-template-columns:48px minmax(0,1fr) !important;padding:58px 20px 14px !important; }
+  body .realm-backdrop section.refined-realm-modal > .realm-modal-body { padding:16px 20px 22px !important; }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title { gap:10px !important; }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title > button { min-height:40px !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid > article { min-height:132px !important;padding:13px !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-icon { width:36px !important;height:36px !important;margin:0 0 14px !important;border-radius:11px !important; }
+  body .realm-backdrop section.refined-realm-modal .matter-title-trigger h4 { font-size:13px !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid > article.is-ended .direction-archive-action { right:20px !important; }
+
+  .quick-todo-backdrop:has(> .unified-todo-create) { padding:18px 14px !important; }
+  .quick-todo-backdrop > .unified-todo-create.unified-todo-edit { width:min(100%,420px) !important;max-width:420px !important;max-height:84dvh !important;border-radius:24px !important;padding:0 18px 16px !important;scale:1 !important;font-family:inherit !important; }
+  .quick-todo-backdrop > .unified-todo-create > header { min-height:72px !important;padding:17px 44px 12px 0 !important; }
+  .quick-todo-backdrop > .unified-todo-create > header h2 { font-size:17px !important; }
+  .quick-todo-backdrop > .unified-todo-create > header p { font-size:10px !important; }
+  .quick-todo-backdrop > .unified-todo-create > .quick-title input { height:46px !important;font-size:14px !important; }
+  .quick-todo-backdrop > .unified-todo-create .quick-form-section { margin-top:14px !important;padding-top:14px !important; }
+  .quick-todo-backdrop > .unified-todo-create .quick-link-fields select,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields input,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields select { height:42px !important;font-size:12px !important; }
+}
+
+@media (max-width: 430px) {
+  .quick-todo-backdrop > .unified-todo-create .quick-link-fields,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields { grid-template-columns:1fr !important;gap:10px !important; }
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields > label:last-child { grid-column:auto !important; }
+}

@@ -66,6 +66,7 @@ import "./mobile-home.css";
 import "./mobile-depth.css";
 import "./mobile-realm.css";
 import "./assistant.css";
+import "./mobile-final.css";
 import {
   isSupabaseConfigured,
   loadCloudSnapshot,
@@ -75,22 +76,34 @@ import {
 import { layoutTimelineItems } from "./lib/timeline-layout";
 
 function useTouchReorder(moveItem) {
-  const moveRef = useRef(moveItem), dragRef = useRef(null);
+  const moveRef = useRef(moveItem), dragRef = useRef(null), suppressClickRef = useRef(false);
   moveRef.current = moveItem;
+  const cleanup = () => {
+    window.clearTimeout(dragRef.current?.timer);
+    dragRef.current?.sourceElement?.classList.remove("is-touch-dragging");
+    dragRef.current?.targetElement?.classList.remove("is-drop-target");
+    dragRef.current?.targetElement?.removeAttribute("data-drop-edge");
+    dragRef.current = null;
+    document.body.classList.remove("mobile-reordering");
+  };
   const bind = (key) => ({
     onTouchStart: (event) => {
       event.stopPropagation();
       const touch = event.touches[0];
+      suppressClickRef.current = false;
       dragRef.current = {
         key: String(key),
         x: touch.clientX,
         y: touch.clientY,
+        sourceElement: event.currentTarget.closest?.("[data-touch-order]") || event.currentTarget,
         timer: window.setTimeout(() => {
           if (!dragRef.current) return;
           dragRef.current.active = true;
+          suppressClickRef.current = true;
+          dragRef.current.sourceElement?.classList.add("is-touch-dragging");
           document.body.classList.add("mobile-reordering");
           navigator.vibrate?.(12);
-        }, 240),
+        }, 320),
       };
     },
     onTouchMove: (event) => {
@@ -105,19 +118,28 @@ function useTouchReorder(moveItem) {
       event.preventDefault();
       const target = document.elementFromPoint(touch.clientX, touch.clientY)?.closest?.("[data-touch-order]");
       const targetKey = target?.dataset.touchOrder;
+      const targetRect = target?.getBoundingClientRect();
+      const dropEdge = targetRect && touch.clientY < targetRect.top + targetRect.height / 2 ? "before" : "after";
+      if (target !== drag.targetElement) {
+        drag.targetElement?.classList.remove("is-drop-target");
+        drag.targetElement?.removeAttribute("data-drop-edge");
+        target?.classList.add("is-drop-target");
+        drag.targetElement = target;
+      }
+      if (target) target.dataset.dropEdge = dropEdge;
       if (targetKey && targetKey !== drag.key) {
         moveRef.current(drag.key, targetKey);
         drag.key = targetKey;
       }
     },
-    onTouchEnd: () => {
-      window.clearTimeout(dragRef.current?.timer);
-      dragRef.current = null;
-      document.body.classList.remove("mobile-reordering");
-    },
+    onTouchEnd: cleanup,
+    onTouchCancel: cleanup,
     onClick: (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+      if (suppressClickRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        suppressClickRef.current = false;
+      }
     },
   });
   return bind;
@@ -432,6 +454,28 @@ function realmForTask(task) {
     realms[3];
 }
 
+function taskCompletedOnDate(task, dateKey) {
+  if (!task.repeat) return Boolean(task.done);
+  if (Array.isArray(task.completedDates) && task.completedDates.includes(dateKey)) return true;
+  if (!task.done || !task.completedAt) return false;
+  return localDateKey(new Date(task.completedAt)) === dateKey;
+}
+
+function taskClockValue(task) {
+  return `${task.clock || ""} ${task.meta || ""} ${task.time || ""}`.match(/\d{1,2}:\d{2}/)?.[0] || "";
+}
+
+function taskIsOverdueOnDate(task, dateKey, now = new Date()) {
+  if (taskCompletedOnDate(task, dateKey)) return false;
+  const todayKey = localDateKey(now);
+  if (dateKey > todayKey) return false;
+  const clock = taskClockValue(task);
+  if (dateKey < todayKey) return Boolean(clock);
+  if (!clock) return false;
+  const [hour, minute] = clock.split(":").map(Number);
+  return now.getHours() * 60 + now.getMinutes() > hour * 60 + minute;
+}
+
 function Header({ title, mobileTitle, openModal, navigate }) {
   const { profile } = useLivaProfile(),
     resolvedTitle = title || `下午好， ${profile.name}`;
@@ -691,20 +735,24 @@ function ScheduleTodoPanel({
     },
     todayKey = new Date().toLocaleDateString("en-CA"),
     matchesSelectedDate = (task) => {
-      if (task.date) return taskOccursOnDate(task, selectedDateKey);
+      if (task.date) {
+        if (taskOccursOnDate(task, selectedDateKey)) return true;
+        // An unfinished one-off item rolls into Today instead of disappearing.
+        return !task.repeat && !task.done && task.date < todayKey && selectedDateKey === todayKey;
+      }
       if (/(?:今天|今晚)/.test(`${task.meta || ""} ${task.time || ""}`))
         return selectedDateKey === todayKey;
       return true;
     },
     active = tasks.filter(
       (t) =>
-        !t.done &&
+        !taskCompletedOnDate(t, selectedDateKey) &&
         !t.archived &&
         t.matterStatus !== "待安排" &&
         matchesSelectedDate(t),
     ),
     completed = tasks.filter(
-      (t) => t.done && !t.archived && matchesSelectedDate(t),
+      (t) => taskCompletedOnDate(t, selectedDateKey) && !t.archived && matchesSelectedDate(t),
     ),
     isTimed = (t) =>
       scheduled.some((s) => s.taskId === t.id) || /\d{1,2}:\d{2}/.test(t.time),
@@ -750,18 +798,18 @@ function ScheduleTodoPanel({
       if (completing.includes(id)) return;
       setCompleting((v) => [...v, id]);
       window.setTimeout(() => {
-        setTasks((v) =>
-          v.map((item) =>
-            item.id === id
-              ? {
-                  ...item,
-                  done: true,
-                  matterStatus: "已结束",
-                  completedAt: new Date().toISOString(),
-                }
-              : item,
-          ),
-        );
+        setTasks((v) => v.map((item) => {
+          if (item.id !== id) return item;
+          if (item.repeat) {
+            return {
+              ...item,
+              done: false,
+              completedAt: new Date().toISOString(),
+              completedDates: [...new Set([...(item.completedDates || []), selectedDateKey])],
+            };
+          }
+          return { ...item, done: true, matterStatus: "已结束", completedAt: new Date().toISOString() };
+        }));
         setCompleting((v) => v.filter((item) => item !== id));
       }, 360);
     };
@@ -781,7 +829,8 @@ function ScheduleTodoPanel({
       {items.map((t) => {
         const arranged = scheduled.some((s) => s.taskId === t.id),
           realm = realmForTask(t),
-          isCompleting = completing.includes(t.id);
+          isCompleting = completing.includes(t.id),
+          isOverdue = taskIsOverdueOnDate(t, selectedDateKey);
         const card = (
           <article
             className={`${arranged ? "arranged " : ""}${isCompleting ? "is-completing" : ""}${deleting.includes(t.id) ? " is-deleting" : ""}`}
@@ -791,7 +840,7 @@ function ScheduleTodoPanel({
               "--task-color": realm?.color || "#8fa39a",
               "--task-tint": realm?.tint || "#f2f5f3",
             }}
-            draggable={!isCompleting}
+            draggable={!isCompleting && !mobileTimeline}
             onDragStart={(e) => {
               e.dataTransfer.effectAllowed = "move";
               e.dataTransfer.setData("text/plain", JSON.stringify(t));
@@ -815,7 +864,7 @@ function ScheduleTodoPanel({
             }}
             key={t.id}
           >
-            <GripVertical className="drag" {...bindTaskTouch(t.id)} />
+            <button className="drag" type="button" aria-label={`拖动调整${t.title}顺序`} {...bindTaskTouch(t.id)}><GripVertical /></button>
             <button
               className="task-check"
               onClick={() => completeTask(t.id)}
@@ -830,7 +879,7 @@ function ScheduleTodoPanel({
             >
               <span className="task-title-line">
                 <b>{t.title}</b>
-                {t.level === "late" && <em>已逾期</em>}
+                {isOverdue && <em>已逾期</em>}
               </span>
               <small>
                 {t.tag} · {t.time}
@@ -927,15 +976,13 @@ function ScheduleTodoPanel({
                     setTasks((v) =>
                       v.map((item) =>
                         item.id === t.id
-                          ? {
-                              ...item,
-                              done: false,
-                              matterStatus: "进行中",
-                              completedAt: null,
-                              date: "",
-                              clock: "",
-                              time: "随时待办",
-                            }
+                          ? item.repeat
+                            ? {
+                                ...item,
+                                done: false,
+                                completedDates: (item.completedDates || []).filter((date) => date !== selectedDateKey),
+                              }
+                            : { ...item, done: false, matterStatus: "进行中", completedAt: null }
                           : item,
                       ),
                     )
@@ -1509,14 +1556,13 @@ function Dashboard({ navigate, openModal, tasks, setTasks, realmVersion }) {
       >
         <div className="realms">
           {orderedRealms.map((r, i) => (
-            <div className="draggable-board-card" data-touch-order={r.name} draggable onDragStart={(e) => {
+            <div className="draggable-board-card" data-touch-order={r.name} {...bindRealmTouch(r.name)} draggable onDragStart={(e) => {
               setDraggedRealm(i);
               e.dataTransfer.effectAllowed = "move";
             }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
               e.preventDefault();
               reorderRealm(i);
             }} onDragEnd={() => setDraggedRealm(null)} key={r.name}>
-              <button className="mobile-reorder-handle" aria-label={`调整${r.name}顺序`} {...bindRealmTouch(r.name)}><GripVertical /></button>
               <RealmCard
                 realm={r}
                 matters={matters}
@@ -1860,18 +1906,18 @@ function TodoPage({ navigate, openModal, tasks, setTasks }) {
         return realms.findIndex((realm) => realm.name === realmForTask(a).name) -
           realms.findIndex((realm) => realm.name === realmForTask(b).name);
       if (sortMode === "status")
-        return Number(a.done) - Number(b.done) || Number(b.level === "late") - Number(a.level === "late");
+        return Number(taskCompletedOnDate(a, selectedDateKey)) - Number(taskCompletedOnDate(b, selectedDateKey)) || Number(taskIsOverdueOnDate(b, selectedDateKey)) - Number(taskIsOverdueOnDate(a, selectedDateKey));
       return taskClock(a).localeCompare(taskClock(b), "zh-CN", { numeric: true });
     }),
     arrangedSource = isMobile
       ? tasks.filter((task) => {
-          if (task.done || task.archived) return false;
+          if (taskCompletedOnDate(task, selectedDateKey) || task.archived) return false;
           if (task.date) return taskOccursOnDate(task, selectedDateKey);
           return /(?:今天|今晚)/.test(`${task.meta || ""} ${task.time || ""}`) && selectedDateKey === todayKey;
         })
       : visibleTasks,
     arrangedTasks = arrangedSource.filter(
-      (t) => !t.done && /\d{1,2}:\d{2}/.test(`${t.meta || ""} ${t.time || ""}`),
+      (t) => !taskCompletedOnDate(t, selectedDateKey) && /\d{1,2}:\d{2}/.test(`${t.meta || ""} ${t.time || ""}`),
     ),
     mobileScheduled = arrangedTasks.map((task) => ({
       id: task.id,
@@ -3806,7 +3852,8 @@ function QuickTodoModal({ close, setTasks, initialTag = "" }) {
 function InspirationMemo({ close, setTasks, onDataChange }) {
   const [draft, setDraft] = useState(""),
     [memos, setMemos] = useState(() => [...inspirationMemos]),
-    [converting, setConverting] = useState([]);
+    [converting, setConverting] = useState([]),
+    [draggedMemoId, setDraggedMemoId] = useState(null);
   const commit = (updater) =>
     setMemos((current) => {
       const next = typeof updater === "function" ? updater(current) : updater;
@@ -3830,6 +3877,14 @@ function InspirationMemo({ close, setTasks, onDataChange }) {
   };
   const update = (id, patch) =>
     commit((v) => v.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  const moveMemo = (source, target) => commit((current) => {
+    const next = [...current], from = next.findIndex((memo) => String(memo.id) === String(source)), to = next.findIndex((memo) => String(memo.id) === String(target));
+    if (from < 0 || to < 0 || from === to) return current;
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    return next;
+  });
+  const bindMemoTouch = useTouchReorder(moveMemo);
   const convert = (memo) => {
     if (converting.includes(memo.id)) return;
     setConverting((current) => [...current, memo.id]);
@@ -3895,8 +3950,24 @@ function InspirationMemo({ close, setTasks, onDataChange }) {
           {memos.map((memo) => (
             <article
               className={`${converting.includes(memo.id) ? "is-converting " : ""}${memo.done ? "done" : ""}`}
+              data-touch-order={memo.id}
+              draggable
+              onDragStart={(event) => {
+                setDraggedMemoId(memo.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", String(memo.id));
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                const source = draggedMemoId ?? event.dataTransfer.getData("text/plain");
+                if (source) moveMemo(source, memo.id);
+                setDraggedMemoId(null);
+              }}
+              onDragEnd={() => setDraggedMemoId(null)}
               key={memo.id}
             >
+              <button className="memo-drag-handle" aria-label={`调整${memo.text}顺序`} {...bindMemoTouch(memo.id)}><GripVertical /></button>
               <button
                 className="memo-check"
                 onClick={() => update(memo.id, { done: !memo.done })}
@@ -4107,12 +4178,29 @@ function migrateAssistantPersonaText(text = "") {
     .replaceAll("巡视", "照亮");
 }
 
+function AssistantMessageBody({ text, report = false }) {
+  if (!report) return <div className="assistant-bubble">{text}</div>;
+  const rows = String(text || "").split("\n").filter((line, index, all) => line.trim() || (index > 0 && all[index - 1].trim()));
+  return (
+    <div className="assistant-bubble assistant-report-body">
+      {rows.map((line, index) => {
+        const value = line.trim();
+        if (/^\*\*.+\*\*$/.test(value)) return <h4 key={index}>{value.replace(/^\*\*|\*\*$/g, "")}</h4>;
+        if (/^-\s*/.test(value)) return <div className="assistant-report-row" key={index}><i /><span>{value.replace(/^-\s*/, "")}</span></div>;
+        if (!value) return <span className="assistant-report-space" key={index} />;
+        return <p key={index}>{value.replace(/\*\*/g, "")}</p>;
+      })}
+    </div>
+  );
+}
+
 function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply }) {
   const { profile } = useLivaProfile();
   const hour = new Date().getHours();
   const dayGreeting = hour < 6 ? "还没睡呀" : hour < 11 ? "早上好" : hour < 14 ? "中午好" : hour < 18 ? "下午好" : "晚上好";
   const [draft, setDraft] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const streamRef = useRef(null);
   const [messages, setMessages] = useState(() => {
     try {
@@ -4128,9 +4216,10 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
   const [pending, setPending] = useState(() => {
     try { return JSON.parse(localStorage.getItem("liva-assistant-pending")); } catch { return null; }
   });
-  const activeTasks = tasks.filter((task) => !task.done && !task.archived);
-  const lateTasks = activeTasks.filter((task) => task.level === "late");
-  const completedTasks = tasks.filter((task) => task.done && !task.archived);
+  const todayDateKey = localDateKey();
+  const activeTasks = tasks.filter((task) => !task.archived && taskOccursOnDate(task, todayDateKey) && !taskCompletedOnDate(task, todayDateKey));
+  const lateTasks = activeTasks.filter((task) => taskIsOverdueOnDate(task, todayDateKey));
+  const completedTasks = tasks.filter((task) => !task.archived && taskCompletedOnDate(task, todayDateKey));
   const nextTimedTask = activeTasks
     .filter((task) => /\d{1,2}:\d{2}/.test(`${task.clock || ""} ${task.time || ""}`))
     .sort((a, b) => `${a.clock || a.time}`.localeCompare(`${b.clock || b.time}`, "zh-CN"))[0];
@@ -4153,7 +4242,7 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowKey = localDateKey(tomorrow);
-    const tomorrowTasks = tasks.filter((task) => !task.done && !task.archived && task.date && taskOccursOnDate(task, tomorrowKey));
+    const tomorrowTasks = tasks.filter((task) => !task.archived && task.date && taskOccursOnDate(task, tomorrowKey) && !taskCompletedOnDate(task, tomorrowKey));
     const formatItems = (items, prefix = "•") => items.length
       ? items.map((item, index) => `${prefix === "letter" ? `${String.fromCharCode(65 + index)}.` : prefix} ${item.title}${item.time ? `（${item.time}）` : ""}`).join("\n")
       : "暂时没有";
@@ -4183,13 +4272,19 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
 
   const respond = async (rawText) => {
     const text = rawText.trim();
-    if (!text || isThinking) return;
+    if (!text || isThinking || isSending) return;
     const history = messages;
-    setMessages((value) => [...value, { role: "user", text }]);
+    const clientId = `user-${Date.now()}`;
+    setMessages((value) => [...value, { role: "user", text, clientId, delivery: "sending" }]);
     setDraft("");
+    setIsSending(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 260));
+    setMessages((value) => value.map((message) => message.clientId === clientId ? { ...message, delivery: "delivered" } : message));
+    await new Promise((resolve) => window.setTimeout(resolve, 320));
+    setIsSending(false);
     setIsThinking(true);
     try {
-      const response = await fetch("/api/assistant", {
+      const [response] = await Promise.all([fetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -4197,13 +4292,13 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
           history,
           context: {
             profile: { name: profile.name },
-            tasks: tasks.filter((task) => !task.archived).map(({ id, title, tag, realm, date, time, repeat, done, level }) => ({ id, title, tag, realm, date, time, repeat, done: Boolean(done), level })),
+            tasks: tasks.filter((task) => !task.archived).map(({ id, title, tag, realm, date, time, repeat, repeatMode, repeatWeekdays, completedDates, done, level }) => ({ id, title, tag, realm, date, time, repeat, repeatMode, repeatWeekdays, completedDates: completedDates || [], done: Boolean(done), level })),
             realms: realms.map((realm) => ({ name: realm.name, note: getRealmNote(realm), directions: realm.directions })),
             matters: matters.filter((matter) => !matter.archived).map(({ title, realm, state, kind, note }) => ({ title, realm, state, kind, note })),
             inspirationMemos: inspirationMemos.map(({ text: memoText, time, done }) => ({ text: memoText, time, done })),
           },
         }),
-      });
+      }), new Promise((resolve) => window.setTimeout(resolve, 680))]);
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "AI 服务暂时不可用");
       if (result.action) setPending(result.action);
@@ -4211,10 +4306,12 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
         role: "assistant",
         kind: result.reply.includes("\n") ? "report" : undefined,
         text: result.reply,
+        arriving: true,
       }]);
+      window.setTimeout(() => setMessages((value) => value.map((message) => message.arriving ? { ...message, arriving: false } : message)), 620);
       onAssistantReply?.();
     } catch (error) {
-      setMessages((value) => [...value, { role: "assistant", kind: "error", text: error.message }]);
+      setMessages((value) => [...value, { role: "assistant", kind: "error", text: error.message, arriving: true }]);
       onAssistantReply?.();
     } finally {
       setIsThinking(false);
@@ -4245,7 +4342,7 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
   const suggestions = [
     ["今天有什么要紧的？", "帮我总结今天的进展"],
     ["检查逾期事项", "有哪些逾期事项？"],
-    ["记录一件新事情", "帮我添加周五整理旅行照片"],
+    ["微光能做什么？", "介绍一下你能帮我做什么，以及会播报哪些内容"],
   ];
   return (
     <div className="assistant-page">
@@ -4260,12 +4357,16 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
           <div className="assistant-stream" aria-live="polite" ref={streamRef}>
             <div className="assistant-day"><span>今天</span></div>
             {messages.map((message, index) => (
-              <div className={`assistant-message ${message.role} ${message.kind || ""}`} key={`${message.role}-${index}`}>
+              <div className={`assistant-message ${message.role} ${message.kind || ""} ${message.arriving ? "is-arriving" : ""} ${message.delivery === "sending" ? "is-sending" : ""}`} key={message.clientId || `${message.role}-${index}`}>
                 {message.role === "assistant" && <span><Sparkles /></span>}
-                <p>{message.text}</p>
+                <div className="assistant-message-stack">
+                  {message.role === "assistant" && <small className="assistant-message-author">微光</small>}
+                  <AssistantMessageBody text={message.text} report={message.kind === "report"} />
+                  {message.role === "user" && message.delivery && <small className="assistant-delivery">{message.delivery === "sending" ? "发送中" : "已送达"}</small>}
+                </div>
               </div>
             ))}
-            {isThinking && <div className="assistant-message assistant thinking"><span><Sparkles /></span><p>微光正在梳理你的想法…</p></div>}
+            {isThinking && <div className="assistant-message assistant thinking"><span><Sparkles /></span><div className="assistant-message-stack"><small className="assistant-message-author">微光</small><div className="assistant-bubble">微光正在梳理你的想法…</div></div></div>}
             {pending && (
               <article className="assistant-action-preview">
                 <header><ListChecks /><div><b>微光准备调整星轨</b><small>确认后才会写入 Liva</small></div></header>
@@ -4285,7 +4386,7 @@ function AssistantPage({ tasks, setTasks, navigate, openModal, onAssistantReply 
           <form className="assistant-composer" onSubmit={(event) => { event.preventDefault(); respond(draft); }}>
             <button type="button" aria-label="语音输入"><Mic /></button>
             <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="和微光说说，或交给它一件事…" />
-            <button className="assistant-send" type="submit" disabled={!draft.trim() || isThinking} aria-label="发送"><Send /></button>
+            <button className="assistant-send" type="submit" disabled={!draft.trim() || isThinking || isSending} aria-label="发送"><Send /></button>
           </form>
           <p className="assistant-note">涉及修改的操作，会先向你确认</p>
         </section>
@@ -4738,6 +4839,36 @@ function App() {
     localStorage.setItem("liva-profile", JSON.stringify(nextProfile));
   }, []);
   const [cloudReady, setCloudReady] = useState(!isSupabaseConfigured);
+  useEffect(() => {
+    let indicated = null;
+    const clearIndicator = () => {
+      indicated?.classList.remove("is-drop-target");
+      indicated?.removeAttribute("data-drop-edge");
+      indicated = null;
+    };
+    const indicateDrop = (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest('[data-touch-order], [draggable="true"]')
+        : null;
+      if (!target) return;
+      if (target !== indicated) {
+        clearIndicator();
+        indicated = target;
+        indicated.classList.add("is-drop-target");
+      }
+      const rect = target.getBoundingClientRect();
+      target.dataset.dropEdge = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+    };
+    document.addEventListener("dragover", indicateDrop, true);
+    document.addEventListener("drop", clearIndicator, true);
+    document.addEventListener("dragend", clearIndicator, true);
+    return () => {
+      clearIndicator();
+      document.removeEventListener("dragover", indicateDrop, true);
+      document.removeEventListener("drop", clearIndicator, true);
+      document.removeEventListener("dragend", clearIndicator, true);
+    };
+  }, []);
   useEffect(() => {
     const scrollTimers = new Map();
     const markScrolling = (event) => {
@@ -6067,6 +6198,7 @@ function LinkedMatters({ openModal, tasks, refreshVersion }) {
           <div
             className="draggable-matter-card"
             data-touch-order={`${item.realm}:${item.title}`}
+            {...bindMatterTouch(`${item.realm}:${item.title}`)}
             draggable
             onDragStart={(e) => {
               setDraggedIndex(index);
@@ -6081,7 +6213,6 @@ function LinkedMatters({ openModal, tasks, refreshVersion }) {
             onDragEnd={() => setDraggedIndex(null)}
             key={`${item.realm}-${item.title}`}
           >
-          <button className="mobile-reorder-handle" aria-label={`调整${item.title}顺序`} {...bindMatterTouch(`${item.realm}:${item.title}`)}><GripVertical /></button>
           <MatterCard
             item={item}
             index={matterIndex}

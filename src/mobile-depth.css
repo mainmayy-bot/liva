@@ -564,6 +564,109 @@
   }
 }
 
+/* 2026-08 mobile interaction pass: compact surfaces and explicit reorder feedback. */
+@media (max-width: 800px) {
+  .mobile-todo-timeline-page .schedule-todos .stats { gap: 6px !important; }
+  .mobile-todo-timeline-page .schedule-todos .stats > div {
+    min-height: 48px !important;
+    border-radius: 12px !important;
+    padding: 5px !important;
+  }
+  .mobile-todo-timeline-page .schedule-todos .stats b { font-size: 16px !important; line-height: 1 !important; }
+  .mobile-todo-timeline-page .schedule-todos .stats span { font-size: 8px !important; }
+
+  body.mobile-reordering { overflow: hidden; touch-action: none; }
+  body.mobile-reordering [data-touch-order] { transition: transform .18s cubic-bezier(.2,.8,.2,1), opacity .18s, box-shadow .18s !important; }
+  [data-touch-order].is-touch-dragging {
+    z-index: 30 !important;
+    opacity: .76 !important;
+    transform: scale(1.025) !important;
+    box-shadow: 0 16px 34px rgba(48,66,56,.18) !important;
+  }
+  [data-touch-order].is-drop-target::before {
+    position: absolute;
+    z-index: 40;
+    right: 8px;
+    bottom: -5px;
+    left: 8px;
+    height: 3px;
+    border-radius: 999px;
+    background: #77a789;
+    box-shadow: 0 0 0 4px rgba(119,167,137,.12);
+    content: "";
+  }
+  #life-map .mobile-reorder-handle { display: none !important; }
+  #life-map .draggable-board-card { touch-action: pan-y; }
+  .tasks .drag,
+  .memo-drag-handle {
+    width: 28px !important;
+    height: 34px !important;
+    min-width: 28px !important;
+    display: grid !important;
+    place-items: center !important;
+    border: 0 !important;
+    border-radius: 9px !important;
+    background: #f3f7f5 !important;
+    color: #71907f !important;
+    touch-action: none;
+  }
+  .tasks .drag { padding: 7px !important; }
+  .memo-drag-handle svg { width: 14px; height: 14px; }
+  .inspiration-list article { position: relative; grid-template-columns:28px 22px minmax(0,1fr) auto !important; align-items:center !important; }
+
+  body .realm-backdrop > section.refined-realm-modal {
+    width: min(calc(100% - 28px), 410px) !important;
+    height: min(82dvh, 700px) !important;
+    max-height: min(82dvh, 700px) !important;
+    border-radius: 24px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal > header {
+    grid-template-columns: 48px minmax(0,1fr) !important;
+    padding: 58px 20px 14px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal > header > span { width:44px !important; height:44px !important; }
+  body .realm-backdrop section.refined-realm-modal > .realm-modal-body { padding:16px 20px 22px !important; }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title { gap:10px !important; }
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title > button { min-height:40px !important; }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid > article {
+    min-height:132px !important;
+    padding:13px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .direction-profile-icon {
+    width:36px !important;height:36px !important;margin:0 0 14px !important;border-radius:11px !important;
+  }
+  body .realm-backdrop section.refined-realm-modal .matter-title-trigger h4 { font-size:13px !important; }
+
+  .quick-todo-backdrop:has(> .unified-todo-create) { padding:18px 14px !important; }
+  .quick-todo-backdrop > .unified-todo-create.unified-todo-edit {
+    width:min(100%,420px) !important;
+    max-width:420px !important;
+    max-height:84dvh !important;
+    border-radius:24px !important;
+    padding:0 18px 16px !important;
+    scale:1 !important;
+    font-family:inherit !important;
+  }
+  .quick-todo-backdrop > .unified-todo-create > header { min-height:72px !important;padding:17px 44px 12px 0 !important; }
+  .quick-todo-backdrop > .unified-todo-create > header > span { width:38px !important;height:38px !important;border-radius:12px !important; }
+  .quick-todo-backdrop > .unified-todo-create > header h2 { font-size:17px !important; }
+  .quick-todo-backdrop > .unified-todo-create > header p { font-size:10px !important; }
+  .quick-todo-backdrop > .unified-todo-create > .quick-title input { height:46px !important;font-size:14px !important; }
+  .quick-todo-backdrop > .unified-todo-create .quick-form-section { margin-top:14px !important;padding-top:14px !important; }
+  .quick-todo-backdrop > .unified-todo-create .quick-section-title,
+  .quick-todo-backdrop > .unified-todo-create label > span { font-size:10px !important; }
+  .quick-todo-backdrop > .unified-todo-create .quick-link-fields select,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields input,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields select { height:42px !important;font-size:12px !important; }
+  .quick-todo-backdrop > .unified-todo-create > .create-todo-footer { margin-top:16px !important; }
+}
+
+@media (max-width: 430px) {
+  .quick-todo-backdrop > .unified-todo-create .quick-link-fields,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields { grid-template-columns:1fr !important;gap:10px !important; }
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields > label:last-child { grid-column:auto !important; }
+}
+
 /* New and edit todo dialogs share one compact centered mobile specification. */
 @media(max-width:800px){
   .quick-todo-backdrop:has(> .unified-todo-create){align-items:center!important;justify-content:center!important;padding:max(18px,env(safe-area-inset-top)) 8px max(18px,env(safe-area-inset-bottom))!important;background:rgba(43,49,46,.34)!important;backdrop-filter:blur(8px)!important}
@@ -684,6 +787,36 @@
   body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-1 i { color: #c98224 !important; border-color: #c98224 !important; }
   body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-2,
   body .realm-backdrop section.refined-realm-modal .direction-profile-state.status-2 i { color: #77817d !important; border-color: #77817d !important; }
+}
+
+/* Final compact mobile geometry. Keep after legacy overrides. */
+@media (max-width: 800px) {
+  .mobile-todo-timeline-page .schedule-todos .stats > div{min-height:48px!important;padding:5px!important}
+  .mobile-todo-timeline-page .schedule-todos .stats b{font-size:16px!important}
+  #life-map .mobile-reorder-handle{display:none!important}
+  body .realm-backdrop > section.refined-realm-modal{width:min(calc(100% - 28px),410px)!important;height:min(82dvh,700px)!important;max-height:min(82dvh,700px)!important;border-radius:24px!important}
+  body .realm-backdrop section.refined-realm-modal > header{grid-template-columns:48px minmax(0,1fr)!important;padding:58px 20px 14px!important}
+  body .realm-backdrop section.refined-realm-modal > .realm-modal-body{padding:16px 20px 22px!important}
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title{gap:10px!important}
+  body .realm-backdrop section.refined-realm-modal .realm-modal-title > button{min-height:40px!important}
+  body .realm-backdrop section.refined-realm-modal .direction-profile-grid > article{min-height:132px!important;padding:13px!important}
+  body .realm-backdrop section.refined-realm-modal .direction-profile-icon{width:36px!important;height:36px!important;margin:0 0 14px!important;border-radius:11px!important}
+  body .realm-backdrop section.refined-realm-modal .matter-title-trigger h4{font-size:13px!important}
+  .quick-todo-backdrop:has(> .unified-todo-create){padding:18px 14px!important}
+  .quick-todo-backdrop > .unified-todo-create.unified-todo-edit{width:min(100%,420px)!important;max-width:420px!important;max-height:84dvh!important;border-radius:24px!important;padding:0 18px 16px!important;scale:1!important;font-family:inherit!important}
+  .quick-todo-backdrop > .unified-todo-create > header{min-height:72px!important;padding:17px 44px 12px 0!important}
+  .quick-todo-backdrop > .unified-todo-create > header h2{font-size:17px!important}
+  .quick-todo-backdrop > .unified-todo-create > header p{font-size:10px!important}
+  .quick-todo-backdrop > .unified-todo-create > .quick-title input{height:46px!important;font-size:14px!important}
+  .quick-todo-backdrop > .unified-todo-create .quick-form-section{margin-top:14px!important;padding-top:14px!important}
+  .quick-todo-backdrop > .unified-todo-create .quick-link-fields select,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields input,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields select{height:42px!important;font-size:12px!important}
+}
+@media (max-width:430px){
+  .quick-todo-backdrop > .unified-todo-create .quick-link-fields,
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields{grid-template-columns:1fr!important;gap:10px!important}
+  .quick-todo-backdrop > .unified-todo-create .quick-time-fields > label:last-child{grid-column:auto!important}
 }
 
 /* Final authority: mobile create-todo mirrors the approved edit-todo dialog. */

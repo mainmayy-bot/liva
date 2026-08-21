@@ -598,7 +598,7 @@ html{scroll-behavior:smooth}
 .inspiration-list-head{display:flex;align-items:center;gap:7px;margin:19px 2px 9px;color:#59645f;font-size:12px;font-weight:600}
 .inspiration-list-head b{display:grid;min-width:20px;height:20px;place-items:center;border-radius:7px;background:#eef3f0;color:#7d8b84;font-size:9px}
 .inspiration-list{display:grid;max-height:350px;gap:8px;overflow:auto;padding-right:3px}
-.inspiration-list article{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:start;gap:9px;border:1px solid #e5eae7;border-radius:13px;background:#fff;padding:12px}
+.inspiration-list article{display:grid;grid-template-columns:14px 22px minmax(0,1fr) auto;align-items:center;gap:9px;border:1px solid #e5eae7;border-radius:13px;background:#fff;padding:12px}
 .inspiration-list article.converted{border-color:#d7e4da;background:#fbfdfb}
 .inspiration-list article.done{opacity:.62}
 .inspiration-list article.done p{text-decoration:line-through}
@@ -606,7 +606,10 @@ html{scroll-behavior:smooth}
 .memo-check{display:grid;width:18px;height:18px;place-items:center;margin-top:1px;border:1px solid #bdc8c2;border-radius:50%;background:#fff;color:#fff}
 .memo-check svg{width:11px;height:11px}
 .done .memo-check{border-color:#83a28d;background:#83a28d}
-.inspiration-list article>div:nth-child(2){min-width:0}
+.memo-drag-handle{display:grid;width:14px;min-width:14px;height:28px;place-items:center;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:#a8b4ae;box-shadow:none;appearance:none;cursor:grab}
+.memo-drag-handle:active{cursor:grabbing}
+.memo-drag-handle svg{width:12px;height:12px}
+.inspiration-list article>div:nth-child(3){min-width:0}
 .inspiration-list p{margin:0;color:#3f4944;font-size:12px;line-height:1.55}
 .inspiration-list small{display:block;margin-top:5px;color:#9ca5a0;font-size:9px}
 .memo-actions{display:flex;gap:2px}
